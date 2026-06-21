@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@airwallex/components-sdk": "^1.30.2",
+    "@fontsource-variable/hanken-grotesk": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
     "@lobehub/icons": "^4.0.2",
     "@stripe/stripe-js": "^9.0.1",
     "@tanstack/vue-virtual": "^3.13.23",

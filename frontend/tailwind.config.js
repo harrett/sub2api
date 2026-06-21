@@ -5,78 +5,79 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 主色调 - Teal/Cyan 青色系
+        // 主色调 - 电流绿 (Instrument / Control Room signal accent)
+        // 400/500 vivid for dark-mode accents & fills; 600+ darkened for text on light.
         primary: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e'
+          50: '#f6ffe5',
+          100: '#e9ffc2',
+          200: '#d4fc92',
+          300: '#bdf657',
+          400: '#a8ec2f',
+          500: '#9ef01a',
+          600: '#5c8a0a',
+          700: '#466b0b',
+          800: '#36510f',
+          900: '#2a3f10',
+          950: '#16280a'
         },
-        // 辅助色 - 深蓝灰
+        // 辅助色 - 冷中性灰 (secondary text / hairline borders)
         accent: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617'
+          50: '#f6f8fa',
+          100: '#eceff3',
+          200: '#d5dbe2',
+          300: '#b0bac6',
+          400: '#7d8a99',
+          500: '#5b6675',
+          600: '#46505d',
+          700: '#353d48',
+          800: '#232a33',
+          900: '#161b22',
+          950: '#0d1117'
         },
-        // 深色模式背景
+        // 深色模式背景 - 墨蓝 ink/surface ramp (drives all dark:bg-dark-* surfaces)
         dark: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617'
+          50: '#eef1f4',
+          100: '#d7dde4',
+          200: '#b8c0cb',
+          300: '#8a96a6',
+          400: '#56616f',
+          500: '#3a4452',
+          600: '#232b37',
+          700: '#1b222e',
+          800: '#151b25',
+          900: '#0f141c',
+          950: '#0a0e14'
         }
       },
       fontFamily: {
         sans: [
+          'Hanken Grotesk Variable',
+          'Hanken Grotesk',
           'system-ui',
           '-apple-system',
           'BlinkMacSystemFont',
           'Segoe UI',
           'Roboto',
-          'Helvetica Neue',
-          'Arial',
           'PingFang SC',
           'Hiragino Sans GB',
           'Microsoft YaHei',
           'sans-serif'
         ],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+        mono: ['IBM Plex Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
       },
       boxShadow: {
         glass: '0 8px 32px rgba(0, 0, 0, 0.08)',
         'glass-sm': '0 4px 16px rgba(0, 0, 0, 0.06)',
-        glow: '0 0 20px rgba(20, 184, 166, 0.25)',
-        'glow-lg': '0 0 40px rgba(20, 184, 166, 0.35)',
+        glow: '0 0 20px rgba(158, 240, 26, 0.28)',
+        'glow-lg': '0 0 40px rgba(158, 240, 26, 0.38)',
         card: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
         'card-hover': '0 10px 40px rgba(0, 0, 0, 0.08)',
         'inner-glow': 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-primary': 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
-        'gradient-dark': 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        'gradient-primary': 'linear-gradient(135deg, #9ef01a 0%, #5c8a0a 100%)',
+        'gradient-dark': 'linear-gradient(135deg, #151b25 0%, #0a0e14 100%)',
         'gradient-glass':
           'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
         'mesh-gradient':
@@ -118,15 +119,20 @@ export default {
           '100%': { backgroundPosition: '200% 0' }
         },
         glow: {
-          '0%': { boxShadow: '0 0 20px rgba(20, 184, 166, 0.25)' },
-          '100%': { boxShadow: '0 0 30px rgba(20, 184, 166, 0.4)' }
+          '0%': { boxShadow: '0 0 20px rgba(158, 240, 26, 0.28)' },
+          '100%': { boxShadow: '0 0 30px rgba(158, 240, 26, 0.42)' }
         }
       },
       backdropBlur: {
         xs: '2px'
       },
       borderRadius: {
-        '4xl': '2rem'
+        // tightened for the instrument aesthetic (sharper corners, hairline feel)
+        lg: '0.375rem',
+        xl: '0.4rem',
+        '2xl': '0.5rem',
+        '3xl': '0.625rem',
+        '4xl': '0.75rem'
       }
     }
   },

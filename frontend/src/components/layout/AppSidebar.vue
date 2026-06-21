@@ -864,12 +864,9 @@ function handleGroupClick(item: NavItem) {
   }
 }
 
-// Initialize theme
+// Initialize theme — dark is the default skin; light only when explicitly chosen.
 const savedTheme = localStorage.getItem('theme')
-if (
-  savedTheme === 'dark' ||
-  (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-) {
+if (savedTheme !== 'light') {
   isDark.value = true
   document.documentElement.classList.add('dark')
 }

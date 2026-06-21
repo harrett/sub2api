@@ -1,0 +1,238 @@
+/* =============================================================================
+ * theme.css — Instrument / Control Room UI overlay
+ * -----------------------------------------------------------------------------
+ * Custom fork skin. Imported AFTER style.css in main.ts so these rules win on
+ * source order. Keep all bespoke visual changes HERE (plus tailwind.config.js)
+ * to stay merge-clean against upstream. Do not rename upstream class names.
+ *
+ * Strategy: drive everything through CSS variables (per-theme), and only touch
+ * shared primitive classes. Pairs `.foo` / `.dark .foo` exist where the upstream
+ * rule used `dark:` variants (higher specificity) so our override actually wins.
+ * Fonts are JS-imported in main.ts (self-hosted @fontsource, no runtime CDN).
+ * ========================================================================== */
+
+:root {
+  /* light "blueprint paper" variant */
+  --ink:         #f4f6f8;
+  --surface-1:   #ffffff;
+  --surface-2:   #f7f9fb;
+  --surface-3:   #eef2f6;
+  --line:        #d7dee6;
+  --grid:        rgba(10, 22, 34, 0.045);
+  --text:        #0f141c;
+  --text-dim:    #51606f;
+  --text-faint:  #8a97a5;
+  --accent:      #5c9c00;          /* darkened lime for contrast on light */
+  --accent-ink:  #ffffff;
+  --accent-dim:  rgba(92, 156, 0, 0.12);
+  --accent-glow: rgba(92, 156, 0, 0.28);
+  --warn:        #c77b12;
+  --down:        #d83a3a;
+  --radius:      6px;
+  --font-sans:   "Hanken Grotesk Variable", "Hanken Grotesk", system-ui, -apple-system,
+                 "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono:   "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+}
+
+.dark {
+  /* dark "control room" variant (primary experience) */
+  --ink:         #0a0e14;
+  --surface-1:   #0f141c;
+  --surface-2:   #151b25;
+  --surface-3:   #1b222e;
+  --line:        #232b37;
+  --grid:        rgba(255, 255, 255, 0.025);
+  --text:        #e6edf3;
+  --text-dim:    #8a96a6;
+  --text-faint:  #56616f;
+  --accent:      #9ef01a;          /* electric lime signal */
+  --accent-ink:  #0a0e14;
+  --accent-dim:  rgba(158, 240, 26, 0.14);
+  --accent-glow: rgba(158, 240, 26, 0.35);
+  --warn:        #f5b13d;
+  --down:        #ff5b5b;
+}
+
+/* ---- base typography ------------------------------------------------------ */
+html { font-family: var(--font-sans); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+.font-mono, code, kbd, pre, samp { font-family: var(--font-mono); }
+
+/* ---- signature: hairline grid + accent glow ------------------------------ *
+ * Painted on the existing fixed `.bg-mesh-gradient` overlay in AppLayout, and
+ * on <body> for routes without that layout (login/setup). No view edits. */
+.bg-mesh-gradient {
+  background-color: transparent;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    radial-gradient(58vw 42vh at 12% -10%, var(--accent-dim), transparent 60%),
+    radial-gradient(48vw 48vh at 100% 0%, rgba(76, 201, 224, 0.05), transparent 55%);
+  background-size: 32px 32px, 32px 32px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+body {
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-attachment: fixed;
+}
+
+/* ---- selection / scrollbar ----------------------------------------------- */
+::selection { background: var(--accent-dim); color: var(--text); }
+*:hover::-webkit-scrollbar-thumb { background-color: var(--line); }
+*:hover::-webkit-scrollbar-thumb:hover { background-color: var(--text-faint); }
+
+/* ---- buttons ------------------------------------------------------------- */
+/* primary: solid lime + near-black ink (white-on-lime is unreadable) */
+.btn-primary,
+.dark .btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent);
+  box-shadow: none;
+}
+.btn-primary:hover,
+.dark .btn-primary:hover {
+  background: var(--accent);
+  filter: brightness(1.07);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 18px var(--accent-glow);
+}
+.btn { border-radius: var(--radius); }
+.btn-secondary,
+.dark .btn-secondary {
+  background: var(--surface-2);
+  color: var(--text-dim);
+  border-color: var(--line);
+}
+.btn-secondary:hover,
+.dark .btn-secondary:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+/* ---- cards --------------------------------------------------------------- */
+.card,
+.dark .card {
+  background-color: var(--surface-1);
+  border-color: var(--line);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+.glass, .glass-card, .card-glass,
+.dark .glass, .dark .glass-card, .dark .card-glass {
+  background-color: color-mix(in oklab, var(--surface-1), transparent 12%);
+  border-color: var(--line);
+}
+.card-header, .dark .card-header,
+.card-footer, .dark .card-footer { border-color: var(--line); }
+
+/* ---- inputs -------------------------------------------------------------- */
+.input,
+.dark .input {
+  background-color: var(--surface-2);
+  border-color: var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+.input:focus,
+.dark .input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-dim);
+}
+
+/* ---- tables (data-dense — the centerpiece) ------------------------------- */
+.table th,
+.dark .table th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background-color: var(--surface-2);
+  border-color: var(--line);
+}
+.table td,
+.dark .table td {
+  border-color: var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.table tbody tr { position: relative; }
+.table tbody tr:hover,
+.dark .table tbody tr:hover { background-color: var(--surface-2); }
+.table tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.table-container, .dark .table-container { border-color: var(--line); }
+
+/* ---- badges (mono, signal-coded) ----------------------------------------- */
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.badge-primary, .dark .badge-primary {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: color-mix(in oklab, var(--accent), transparent 65%);
+}
+
+/* ---- sidebar active marker ----------------------------------------------- */
+.sidebar, .dark .sidebar { border-color: var(--line); background-color: var(--surface-1); }
+.sidebar-link-active { position: relative; }
+.sidebar-link-active::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ---- stat cards: big mono numerals --------------------------------------- */
+.stat-value, .dark .stat-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ---- tabs → underline style (replaces pill) ------------------------------ */
+.tabs, .dark .tabs {
+  background: transparent;
+  padding: 0;
+  gap: 2px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+}
+.tab { border-bottom: 2px solid transparent; border-radius: 0; margin-bottom: -1px; }
+.tab-active, .dark .tab-active {
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ---- modal / dialog: sharper, hairline ----------------------------------- */
+.modal-content, .dark .modal-content,
+.dialog-container, .dark .dialog-container {
+  background-color: var(--surface-1);
+  border-color: var(--line);
+  border-radius: var(--radius);
+}
+.modal-header, .dark .modal-header,
+.modal-footer, .dark .modal-footer,
+.dialog-header, .dark .dialog-header,
+.dialog-footer, .dark .dialog-footer { border-color: var(--line); }
+
+/* ---- progress / switch --------------------------------------------------- */
+.progress, .dark .progress { background-color: var(--surface-3); }
+.progress-bar { background: var(--accent); }
+.switch-active { background-color: var(--accent); }
+
+/* ---- toast --------------------------------------------------------------- */
+.toast, .dark .toast { background-color: var(--surface-1); border-color: var(--line); }
+.toast-info { border-left-color: var(--accent); }
