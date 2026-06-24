@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>使用文档 — Sub2API</title>
+<meta name="description" content="Sub2API 接入文档：OpenAI Codex / Claude Code 在 Windows / macOS 下的安装配置教程。" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%239ef01a'/><text x='16' y='22' text-anchor='middle' font-family='monospace' font-size='18' font-weight='bold' fill='%230a0e14'>S</text></svg>" />
+<link rel="stylesheet" href="/site-assets/style.css" />
+<style>
+/* ── Product tabs ──────────────────────────────── */
+.prod-selector {
+  margin: 0 0 28px;
+}
+.prod-selector-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-faint);
+  margin-bottom: 10px;
+}
+.prod-tabs {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.prod-tab {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-sans); font-size: 13.5px; font-weight: 600;
+  padding: 9px 18px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--text-dim); cursor: pointer; outline: none;
+  transition: background .14s, color .14s, border-color .14s;
+}
+.prod-tab:hover { color: var(--text); background: var(--surface-3); }
+.prod-tab.active {
+  background: var(--accent); color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.prod-tab svg { flex-shrink: 0; }
+
+/* ── OS tabs ───────────────────────────────────── */
+.os-selector-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-faint);
+  margin-bottom: 10px;
+}
+.os-tabs {
+  display: flex; gap: 0; border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--surface-2); width: fit-content; margin: 0 0 32px;
+}
+.os-tab {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-sans); font-size: 13.5px; font-weight: 600;
+  padding: 9px 20px; background: transparent; border: 0;
+  border-right: 1px solid var(--line); color: var(--text-dim);
+  cursor: pointer; transition: background .14s, color .14s; outline: none;
+}
+.os-tab:last-child { border-right: 0; }
+.os-tab:hover { color: var(--text); background: var(--surface-3); }
+.os-tab.active { background: var(--surface-1); color: var(--text); }
+.os-tab svg { flex-shrink: 0; opacity: .65; }
+.os-tab.active svg { opacity: 1; }
+
+/* ── Product + Platform blocks ─────────────────── */
+.prod { display: none; }
+.prod.visible { display: block; }
+.plat { display: none; }
+.plat.visible { display: block; }
+
+/* ── Notice boxes ──────────────────────────────── */
+.notice {
+  display: flex; gap: 10px; padding: 13px 16px;
+  border-radius: var(--radius); margin: 18px 0;
+  font-size: 13px; line-height: 1.7;
+}
+.notice.warn {
+  background: rgba(245,177,61,.08); border: 1px solid rgba(245,177,61,.25); color: var(--text-dim);
+}
+.notice.info {
+  background: rgba(76,201,224,.07); border: 1px solid rgba(76,201,224,.2); color: var(--text-dim);
+}
+.notice.intro {
+  background: rgba(158,240,26,.05); border: 1px solid rgba(158,240,26,.18); color: var(--text-dim);
+}
+.notice svg { flex-shrink: 0; margin-top: 2px; }
+.notice strong { color: var(--text); }
+
+/* ── Install method tabs ────────────────────────── */
+.mtabs { display: flex; gap: 0; margin: 20px 0 0; border-bottom: 1px solid var(--line); }
+.mtab {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase;
+  padding: 8px 16px; background: transparent; border: 0;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  color: var(--text-faint); cursor: pointer; outline: none;
+  transition: color .14s, border-color .14s;
+}
+.mtab:hover { color: var(--text-dim); }
+.mtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.mtab .rec {
+  font-size: 8.5px; letter-spacing: .07em; padding: 1px 5px; border-radius: 2px;
+  background: var(--accent-dim); border: 1px solid rgba(158,240,26,.22); color: var(--accent);
+  margin-left: 5px; vertical-align: 1px;
+}
+.mtab .dep {
+  font-size: 8.5px; letter-spacing: .07em; padding: 1px 5px; border-radius: 2px;
+  background: rgba(245,177,61,.08); border: 1px solid rgba(245,177,61,.3); color: var(--warn);
+  margin-left: 5px; vertical-align: 1px;
+}
+.mblock { display: none; }
+.mblock.visible { display: block; }
+
+/* ── Collapsibles ──────────────────────────────── */
+.coll-head {
+  display: flex; align-items: center; gap: 8px; font-size: 13px;
+  color: var(--text-faint); cursor: pointer; padding: 11px 0;
+  user-select: none; border-top: 1px solid var(--line); transition: color .14s;
+}
+.coll-head:hover { color: var(--text-dim); }
+.coll-head::after {
+  content: "\203A"; font-family: var(--font-mono); font-size: 16px;
+  margin-left: auto; transition: transform .18s; color: var(--text-faint);
+}
+.coll-head.open::after { transform: rotate(90deg); color: var(--accent); }
+.coll-body { display: none; padding: 4px 0 12px; }
+.coll-body.open { display: block; }
+
+/* ── Sub-headings ──────────────────────────────── */
+.dh4 {
+  font-size: 13px; font-weight: 700; color: var(--text-dim);
+  margin: 24px 0 10px; display: flex; align-items: center; gap: 8px;
+}
+.dh4::before { content: "\203A"; color: var(--accent); font-family: var(--font-mono); }
+
+/* ── TOC sidebar ───────────────────────────────── */
+.toc-os { display: flex; gap: 4px; padding: 8px 12px 4px; }
+.toc-os-btn {
+  flex: 1; font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; text-align: center;
+  padding: 6px 4px; border-radius: var(--radius); border: 1px solid var(--line);
+  background: transparent; color: var(--text-faint); cursor: pointer;
+  transition: background .14s, color .14s, border-color .14s; outline: none;
+}
+.toc-os-btn:hover { color: var(--text-dim); background: var(--surface-3); }
+.toc-os-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <span class="logo-mark">S</span>
+      <span class="logo-text">
+        <span class="logo-name">Sub2API</span>
+        <span class="logo-sub">API Relay</span>
+      </span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html">首页</a>
+      <a href="pricing.html">定价</a>
+      <a href="docs.html" class="active">文档</a>
+    </div>
+    <div class="nav-spacer"></div>
+    <div class="nav-auth">
+      <a href="/login" class="btn btn-ghost btn-sm">登录</a>
+      <a href="/register" class="btn btn-primary btn-sm">免费注册</a>
+    </div>
+  </div>
+</nav>
+
+<!-- DOCS LAYOUT -->
+<div class="docs-outer">
+
+  <!-- TOC Sidebar -->
+  <aside class="docs-toc" id="docs-toc">
+    <div class="toc-os" id="toc-os-toggle">
+      <button class="toc-os-btn active" data-os="win">Windows</button>
+      <button class="toc-os-btn" data-os="mac">macOS</button>
+    </div>
+
+    <span class="toc-head" id="toc-prod-head">OPENAI CODEX</span>
+    <a href="#intro"    class="toc-a sub" id="toc-intro">工具简介</a>
+    <a href="#prereq"   class="toc-a sub" id="toc-prereq">前置：安装 Git</a>
+    <a href="#install"  class="toc-a sub">安装</a>
+    <a href="#envvars"  class="toc-a sub">配置环境变量</a>
+    <a href="#launch"   class="toc-a sub">启动使用</a>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="docs-content">
+
+    <section class="doc-section animate">
+      <span class="doc-tag">TUTORIAL</span>
+      <h2 class="doc-h2">接入教程</h2>
+      <p class="doc-p">选择工具和操作系统，按步骤完成安装与 Sub2API 配置，约 3 分钟。</p>
+
+      <!-- ── Product selector ─────────────────── -->
+      <div class="prod-selector">
+        <div class="prod-selector-label">选择工具</div>
+        <div class="prod-tabs" id="prod-tabs">
+          <button class="prod-tab active" data-prod="codex">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
+            OpenAI Codex
+          </button>
+          <button class="prod-tab" data-prod="claude">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.304 1.303C12.653-.093 7.805 2.583 6.41 7.234l-.763 2.62-2.665.37C.406 10.6-1.178 13.97.9 16.697l1.55 2.12-1.017 2.55c-1.67 4.194 1.826 8.588 6.288 7.94l2.701-.39 1.748 2.186c2.839 3.55 8.413 3.152 10.712-.767l1.205-2.078 2.572-.696c4.508-1.222 6.242-6.635 3.23-10.123l-1.73-1.993.538-2.657c.942-4.648-2.437-9.063-7.193-9.486zm-6.246 5.58c1.187-4.077 5.433-6.43 9.51-5.244 3.94 1.148 6.16 5.208 5.018 9.15l-.67 2.306 1.68 1.94c2.322 2.681 1.09 6.861-2.008 7.895l-2.56.693-1.22 2.101c-1.81 3.11-5.97 3.393-8.18.554l-1.7-2.127-2.654.383c-3.416.494-5.87-2.988-4.607-6.172l1.082-2.714-1.538-2.103C2.14 11.21 3.397 7.53 6.471 7.07l2.738-.38z"/></svg>
+            Claude Code
+          </button>
+        </div>
+      </div>
+
+      <!-- ── OS selector ──────────────────────── -->
+      <div>
+        <div class="os-selector-label">选择操作系统</div>
+        <div class="os-tabs" id="os-tabs">
+          <button class="os-tab active" data-os="win">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.557l7.357-1.01.003 7.108-7.354.042L3 5.557zm7.354 6.913l.004 7.118L3 18.443v-6.017l7.354.044zm.892-8.046L21.001 3v8.562l-9.755.077V4.424zm9.758 8.113l-.003 8.524-9.755-1.375-.014-7.168 9.772.019z"/></svg>
+            Windows
+          </button>
+          <button class="os-tab" data-os="mac">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            macOS
+          </button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════
+           PRODUCT: OPENAI CODEX
+           ════════════════════════════════════════════════════ -->
+      <div class="prod visible" id="prod-codex">
+
+        <!-- CODEX + WINDOWS -->
+        <div class="plat visible" id="codex-win">
+
+          <section id="intro" class="doc-section" style="margin-bottom:32px">
+            <div class="notice intro">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
+              <div>
+                <strong>Codex 简介</strong><br>
+                OpenAI Codex CLI 是 OpenAI 官方推出的命令行 AI 编程助手，类似于 Claude Code，但使用 OpenAI 的模型（如 GPT-4o、o1、o3 等）。通过 Sub2API 接入，无需海外信用卡，直接用人民币充值调用。
+              </div>
+            </div>
+          </section>
+
+          <div class="notice warn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="color:var(--warn)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+            <div><strong>推荐使用 WSL 或 Git Bash</strong><br>
+            Codex 在 Windows 上推荐使用 <strong>WSL</strong>（Windows Subsystem for Linux）安装和运行，兼容性最好。如果不想装 WSL，至少使用 <strong>Git Bash</strong> 来运行 Codex。<strong>PowerShell 兼容性较差</strong>，可能遇到文件锁定、写入失败（error write file）等问题。</div>
+          </div>
+
+          <!-- Step 0: Git (Codex Windows) -->
+          <section id="prereq" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">0</span>前置要求：安装 Git</h3>
+            <p class="doc-p">Codex 在 Windows 下依赖 Git Bash 运行。前往 <a href="https://git-scm.com/downloads/win">git-scm.com</a> 下载安装，保持默认选项。安装后重启终端验证：</p>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="cw-git-ver">COPY</button></div>
+              <pre id="cw-git-ver">git --version</pre>
+            </div>
+          </section>
+
+          <!-- Step 1: Install Codex Windows -->
+          <section id="install" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">1</span>安装 Node.js 和 Codex</h3>
+            <p class="doc-p">Codex CLI 通过 npm 安装，需要 Node.js 18+。</p>
+
+            <div class="dh4">安装 Node.js</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="cw-node">COPY</button></div>
+              <pre id="cw-node"><span class="cm"># WinGet（推荐）</span>
+winget install OpenJS.NodeJS.LTS
+
+<span class="cm"># 或前往官网下载</span>
+<span class="cm"># https://nodejs.org/</span></pre>
+            </div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL · 验证</span></div>
+              <pre>node --version
+npm --version</pre>
+            </div>
+
+            <div class="dh4">安装 Codex CLI</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL / BASH</span><button class="copy-btn" data-target="cw-install">COPY</button></div>
+              <pre id="cw-install">npm install -g @openai/codex
+
+<span class="cm"># 国内镜像（下载慢可用）</span>
+npm install -g @openai/codex <span class="flag">--registry=</span><span class="str">https://registry.npmmirror.com</span></pre>
+            </div>
+
+            <div class="dh4">验证安装</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="cw-ver">COPY</button></div>
+              <pre id="cw-ver">codex --version</pre>
+            </div>
+          </section>
+
+          <!-- Step 2: Env Vars Codex Windows -->
+          <section id="envvars" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">2</span>配置环境变量</h3>
+            <p class="doc-p">按 <code>Win+X</code> → 选择「终端管理员」，运行（替换为你的域名和 Key）：</p>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL · 管理员</span><button class="copy-btn" data-target="cw-env">COPY</button></div>
+              <pre id="cw-env">[System.Environment]::SetEnvironmentVariable(<span class="str">"OPENAI_BASE_URL"</span>, <span class="hl">"https://api.your-domain.com/v1"</span>, [System.EnvironmentVariableTarget]::Machine)
+[System.Environment]::SetEnvironmentVariable(<span class="str">"OPENAI_API_KEY"</span>, <span class="hl">"sk-sub2-YOUR_KEY"</span>, [System.EnvironmentVariableTarget]::Machine)</pre>
+            </div>
+            <p class="doc-p" style="color:var(--text-faint);font-size:12.5px">设置后需<strong>重新打开终端</strong>才能生效。</p>
+
+            <div class="dh4">验证</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="cw-env-ver">COPY</button></div>
+              <pre id="cw-env-ver">Get-ChildItem Env:OPENAI_*</pre>
+            </div>
+
+            <div class="coll-head" id="head-cw-clean">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="color:var(--warn)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+              之前用过其他中转？清理旧配置
+            </div>
+            <div class="coll-body" id="body-cw-clean">
+              <div class="code-block">
+                <div class="code-head"><span class="code-lang">POWERSHELL · 管理员</span><button class="copy-btn" data-target="cw-clean">COPY</button></div>
+                <pre id="cw-clean"><span class="cm"># 检查现有配置</span>
+Get-ChildItem Env:OPENAI_*
+<span class="cm"># 清理</span>
+[Environment]::SetEnvironmentVariable('OPENAI_BASE_URL', $null, 'Machine')
+[Environment]::SetEnvironmentVariable('OPENAI_API_KEY',  $null, 'Machine')</pre>
+              </div>
+            </div>
+          </section>
+
+          <!-- Step 3: Launch Codex Windows -->
+          <section id="launch" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">3</span>启动 Codex</h3>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH / GIT BASH</span><button class="copy-btn" data-target="cw-launch">COPY</button></div>
+              <pre id="cw-launch"><span class="cm"># 进入项目目录</span>
+cd /c/path/to/your/project
+
+<span class="cm"># 启动（推荐在 Git Bash 或 WSL 中运行）</span>
+codex</pre>
+            </div>
+            <div class="notice info">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--info)"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+              <div>首次运行会进行初始化。若提示登录 OpenAI，选择跳过或直接使用 API Key 模式（已通过 <code>OPENAI_API_KEY</code> 环境变量配置）。</div>
+            </div>
+          </section>
+
+        </div><!-- /#codex-win -->
+
+        <!-- CODEX + macOS -->
+        <div class="plat" id="codex-mac">
+
+          <section id="intro" class="doc-section" style="margin-bottom:32px">
+            <div class="notice intro">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
+              <div>
+                <strong>Codex 简介</strong><br>
+                OpenAI Codex CLI 是 OpenAI 官方推出的命令行 AI 编程助手，类似于 Claude Code，但使用 OpenAI 的模型（如 GPT-4o、o1、o3 等）。通过 Sub2API 接入，无需海外信用卡，直接用人民币充值调用。
+              </div>
+            </div>
+          </section>
+
+          <div class="notice info">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="color:var(--info)"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+            <div>macOS 默认 shell 为 <code>zsh</code>（可通过 <code>echo $SHELL</code> 确认）。推荐使用系统「终端」或 <a href="https://iterm2.com/">iTerm2</a>。</div>
+          </div>
+
+          <!-- Step 1: Install Codex macOS -->
+          <section id="install" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">1</span>安装 Node.js 和 Codex</h3>
+
+            <div class="dh4">安装 Node.js</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="cm-node">COPY</button></div>
+              <pre id="cm-node"><span class="cm"># Homebrew（推荐）</span>
+brew install node
+
+<span class="cm"># 或 nvm（多版本管理）</span>
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.zshrc
+nvm install --lts</pre>
+            </div>
+
+            <div class="dh4">安装 Codex CLI</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="cm-install">COPY</button></div>
+              <pre id="cm-install">npm install -g @openai/codex
+
+<span class="cm"># 国内镜像</span>
+npm install -g @openai/codex <span class="flag">--registry=</span><span class="str">https://registry.npmmirror.com</span></pre>
+            </div>
+
+            <div class="dh4">验证安装</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="cm-ver">COPY</button></div>
+              <pre id="cm-ver">codex --version</pre>
+            </div>
+          </section>
+
+          <!-- Step 2: Env Vars Codex macOS -->
+          <section id="envvars" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">2</span>配置环境变量</h3>
+            <p class="doc-p">编辑 <code>~/.zshrc</code>（或 <code>~/.bash_profile</code>）：</p>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="cm-env">COPY</button></div>
+              <pre id="cm-env"><span class="cm"># 打开配置文件</span>
+nano ~/.zshrc
+
+<span class="cm"># 在末尾添加（替换为你的域名和 Key）：</span>
+export OPENAI_BASE_URL=<span class="hl">"https://api.your-domain.com/v1"</span>
+export OPENAI_API_KEY=<span class="hl">"sk-sub2-YOUR_KEY"</span>
+
+<span class="cm"># 保存（Ctrl+O → Enter → Ctrl+X），然后应用：</span>
+source ~/.zshrc</pre>
+            </div>
+
+            <div class="dh4">验证</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="cm-env-ver">COPY</button></div>
+              <pre id="cm-env-ver">env | grep OPENAI</pre>
+            </div>
+
+            <div class="coll-head" id="head-cm-clean">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="color:var(--warn)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+              之前用过其他中转？清理旧配置
+            </div>
+            <div class="coll-body" id="body-cm-clean">
+              <div class="code-block">
+                <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="cm-clean">COPY</button></div>
+                <pre id="cm-clean"><span class="cm"># 检查现有配置</span>
+env | grep OPENAI
+<span class="cm"># 编辑 ~/.zshrc，删除旧的 OPENAI_* 行</span>
+nano ~/.zshrc</pre>
+              </div>
+            </div>
+          </section>
+
+          <!-- Step 3: Launch Codex macOS -->
+          <section id="launch" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">3</span>启动 Codex</h3>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="cm-launch">COPY</button></div>
+              <pre id="cm-launch"><span class="cm"># 进入项目目录</span>
+cd /path/to/your/project
+
+<span class="cm"># 启动</span>
+codex</pre>
+            </div>
+            <div class="notice info">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--info)"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+              <div>首次运行会进行初始化。若提示登录 OpenAI，选择跳过或使用 API Key 模式（已通过 <code>OPENAI_API_KEY</code> 环境变量配置）。</div>
+            </div>
+          </section>
+
+        </div><!-- /#codex-mac -->
+
+      </div><!-- /#prod-codex -->
+
+      <!-- ════════════════════════════════════════════════════
+           PRODUCT: CLAUDE CODE
+           ════════════════════════════════════════════════════ -->
+      <div class="prod" id="prod-claude">
+
+        <!-- CLAUDE + WINDOWS -->
+        <div class="plat visible" id="claude-win">
+
+          <div class="notice warn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="color:var(--warn)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+            <div><strong>推荐使用 WSL 或 Git Bash</strong><br>
+            Claude Code 在 Windows 原生 PowerShell/CMD 下可能遇到文件锁定、路径问题。推荐使用 <strong>WSL</strong> 或 <strong>Git Bash</strong> 安装和运行。若必须使用 PowerShell，请以<strong>管理员权限</strong>运行。</div>
+          </div>
+          <div class="notice info">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="color:var(--info)"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+            <div>推荐安装 <strong>Windows Terminal</strong>（微软官方现代终端，多标签 + 更好的中文显示），可从 Microsoft Store 免费获取。</div>
+          </div>
+
+          <!-- Step 0: Git (Claude Windows) -->
+          <section id="prereq" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">0</span>前置要求：安装 Git</h3>
+            <p class="doc-p">Claude Code 依赖 Git 运行。若启动后看到以下错误，说明需要先安装 Git：</p>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">ERROR</span></div>
+              <pre style="color:var(--down)">Claude Code on Windows requires git-bash (https://git-scm.com/downloads/win).
+If installed but not in PATH, set environment variable:
+  CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe</pre>
+            </div>
+            <p class="doc-p">前往 <a href="https://git-scm.com/downloads/win">git-scm.com</a> 下载安装，保持默认选项。安装后重启终端验证：</p>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="clw-git-ver">COPY</button></div>
+              <pre id="clw-git-ver">git --version</pre>
+            </div>
+            <div class="coll-head" id="head-clw-gitpath">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="color:var(--warn)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+              Git 已安装但提示找不到 bash？自动检测路径
+            </div>
+            <div class="coll-body" id="body-clw-gitpath">
+              <div class="code-block">
+                <div class="code-head"><span class="code-lang">POWERSHELL · 管理员</span><button class="copy-btn" data-target="clw-gitdetect">COPY</button></div>
+                <pre id="clw-gitdetect">$p = @(
+  "$env:ProgramFiles\Git\bin\bash.exe",
+  "${env:ProgramFiles(x86)}\Git\bin\bash.exe",
+  "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
+)
+$f = $p | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($f) {
+    [Environment]::SetEnvironmentVariable("CLAUDE_CODE_GIT_BASH_PATH", $f, "Machine")
+    "已设置: $f"
+} else { "未找到 Git，请先安装" }</pre>
+              </div>
+            </div>
+          </section>
+
+          <!-- Step 1: Install Claude Windows -->
+          <section id="install" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">1</span>安装 Claude Code</h3>
+
+            <div class="mtabs" id="mtabs-clwin">
+              <button class="mtab active" data-method="clwin-native">原生安装 <span class="rec">推荐</span></button>
+              <button class="mtab" data-method="clwin-winget">WinGet</button>
+              <button class="mtab" data-method="clwin-npm">npm <span class="dep">弃用</span></button>
+            </div>
+
+            <div class="mblock visible" id="clwin-native">
+              <p class="doc-p" style="margin-top:14px">官方推荐，<strong>无需 Node.js</strong>，后台自动更新：</p>
+              <div class="code-block">
+                <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="clw-native">COPY</button></div>
+                <pre id="clw-native">irm https://claude.ai/install.ps1 | iex</pre>
+              </div>
+            </div>
+            <div class="mblock" id="clwin-winget">
+              <div class="code-block" style="margin-top:14px">
+                <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="clw-winget">COPY</button></div>
+                <pre id="clw-winget">winget install Anthropic.ClaudeCode</pre>
+              </div>
+              <div class="notice warn" style="margin-top:10px">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--warn)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+                <div>WinGet <strong>不会自动更新</strong>，需手动运行 <code>winget upgrade Anthropic.ClaudeCode</code>。</div>
+              </div>
+            </div>
+            <div class="mblock" id="clwin-npm">
+              <div class="notice warn" style="margin-top:14px">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--warn)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+                <div>已被官方<strong>标记弃用</strong>，需要 Node.js 18+。</div>
+              </div>
+              <div class="code-block" style="margin-top:8px">
+                <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="clw-npm">COPY</button></div>
+                <pre id="clw-npm">npm install -g @anthropic-ai/claude-code <span class="flag">--registry=</span><span class="str">https://registry.npmmirror.com</span></pre>
+              </div>
+            </div>
+
+            <div class="dh4">验证安装</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="clw-ver">COPY</button></div>
+              <pre id="clw-ver">claude --version</pre>
+            </div>
+          </section>
+
+          <!-- Step 2: Env Vars Claude Windows -->
+          <section id="envvars" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">2</span>配置环境变量</h3>
+            <p class="doc-p">按 <code>Win+X</code> → 选择「终端管理员」，运行（替换为你的域名和 Key）：</p>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL · 管理员</span><button class="copy-btn" data-target="clw-env">COPY</button></div>
+              <pre id="clw-env">[System.Environment]::SetEnvironmentVariable(<span class="str">"ANTHROPIC_BASE_URL"</span>, <span class="hl">"https://api.your-domain.com"</span>, [System.EnvironmentVariableTarget]::Machine)
+[System.Environment]::SetEnvironmentVariable(<span class="str">"ANTHROPIC_AUTH_TOKEN"</span>, <span class="hl">"sk-sub2-YOUR_KEY"</span>, [System.EnvironmentVariableTarget]::Machine)
+[System.Environment]::SetEnvironmentVariable(<span class="str">"API_TIMEOUT_MS"</span>, <span class="str">"3000000"</span>, [System.EnvironmentVariableTarget]::Machine)
+[System.Environment]::SetEnvironmentVariable(<span class="str">"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"</span>, <span class="str">"1"</span>, [System.EnvironmentVariableTarget]::Machine)</pre>
+            </div>
+            <p class="doc-p" style="color:var(--text-faint);font-size:12.5px">设置后需<strong>重新打开终端</strong>才能生效。</p>
+
+            <div class="dh4">验证</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL</span><button class="copy-btn" data-target="clw-env-ver">COPY</button></div>
+              <pre id="clw-env-ver">Get-ChildItem Env:ANTHROPIC_*</pre>
+            </div>
+          </section>
+
+          <!-- Step 3: Launch Claude Windows -->
+          <section id="launch" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">3</span>启动 Claude Code</h3>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">POWERSHELL / BASH</span><button class="copy-btn" data-target="clw-launch">COPY</button></div>
+              <pre id="clw-launch">cd C:\path\to\your\project
+claude</pre>
+            </div>
+            <div class="notice info">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--info)"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+              <div>首次启动会进行初始化。若弹出登录提示，按 <code>Esc</code> 跳过（已通过环境变量配置了 Key）。</div>
+            </div>
+          </section>
+
+        </div><!-- /#claude-win -->
+
+        <!-- CLAUDE + macOS -->
+        <div class="plat" id="claude-mac">
+
+          <div class="notice info">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="color:var(--info)"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+            <div>macOS 默认 shell 为 <code>zsh</code>（可通过 <code>echo $SHELL</code> 确认）。推荐使用系统「终端」或 <a href="https://iterm2.com/">iTerm2</a>。</div>
+          </div>
+
+          <!-- Step 1: Install Claude macOS -->
+          <section id="install" class="doc-section" style="margin-top:28px">
+            <h3 class="doc-h3"><span class="step-num">1</span>安装 Claude Code</h3>
+
+            <div class="mtabs" id="mtabs-clmac">
+              <button class="mtab active" data-method="clmac-native">原生安装 <span class="rec">推荐</span></button>
+              <button class="mtab" data-method="clmac-brew">Homebrew</button>
+              <button class="mtab" data-method="clmac-npm">npm <span class="dep">弃用</span></button>
+            </div>
+
+            <div class="mblock visible" id="clmac-native">
+              <p class="doc-p" style="margin-top:14px">官方推荐，<strong>无需 Node.js</strong>，后台自动更新：</p>
+              <div class="code-block">
+                <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="clm-native">COPY</button></div>
+                <pre id="clm-native">curl -fsSL https://claude.ai/install.sh | sh</pre>
+              </div>
+            </div>
+            <div class="mblock" id="clmac-brew">
+              <div class="code-block" style="margin-top:14px">
+                <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="clm-brew">COPY</button></div>
+                <pre id="clm-brew">brew install claude-code</pre>
+              </div>
+            </div>
+            <div class="mblock" id="clmac-npm">
+              <div class="notice warn" style="margin-top:14px">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--warn)"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+                <div>已被官方<strong>标记弃用</strong>，需要 Node.js 18+。</div>
+              </div>
+              <div class="code-block" style="margin-top:8px">
+                <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="clm-npm">COPY</button></div>
+                <pre id="clm-npm">npm install -g @anthropic-ai/claude-code <span class="flag">--registry=</span><span class="str">https://registry.npmmirror.com</span></pre>
+              </div>
+            </div>
+
+            <div class="dh4">验证安装</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="clm-ver">COPY</button></div>
+              <pre id="clm-ver">claude --version</pre>
+            </div>
+          </section>
+
+          <!-- Step 2: Env Vars Claude macOS -->
+          <section id="envvars" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">2</span>配置环境变量</h3>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="clm-env">COPY</button></div>
+              <pre id="clm-env"><span class="cm"># 打开配置文件</span>
+nano ~/.zshrc
+
+<span class="cm"># 在末尾添加（替换为你的域名和 Key）：</span>
+export ANTHROPIC_BASE_URL=<span class="hl">"https://api.your-domain.com"</span>
+export ANTHROPIC_AUTH_TOKEN=<span class="hl">"sk-sub2-YOUR_KEY"</span>
+export API_TIMEOUT_MS=<span class="str">"3000000"</span>
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=<span class="str">"1"</span>
+
+<span class="cm"># 保存后应用：</span>
+source ~/.zshrc</pre>
+            </div>
+
+            <div class="dh4">验证</div>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="clm-env-ver">COPY</button></div>
+              <pre id="clm-env-ver">env | grep ANTHROPIC</pre>
+            </div>
+          </section>
+
+          <!-- Step 3: Launch Claude macOS -->
+          <section id="launch" class="doc-section" style="margin-top:32px">
+            <h3 class="doc-h3"><span class="step-num">3</span>启动 Claude Code</h3>
+            <div class="code-block">
+              <div class="code-head"><span class="code-lang">BASH</span><button class="copy-btn" data-target="clm-launch">COPY</button></div>
+              <pre id="clm-launch">cd /path/to/your/project
+claude</pre>
+            </div>
+            <div class="notice info">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:var(--info)"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+              <div>首次启动会进行初始化。若弹出登录提示，按 <code>Esc</code> 跳过（已通过环境变量配置了 Key）。</div>
+            </div>
+          </section>
+
+        </div><!-- /#claude-mac -->
+
+      </div><!-- /#prod-claude -->
+    </section>
+
+    <!-- CTA -->
+    <div style="border-top:1px solid var(--line);padding-top:40px;margin-top:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px" class="animate">
+      <div>
+        <div style="font-weight:700;color:var(--text);margin-bottom:4px">注册即送免费额度</div>
+        <div style="font-size:13px;color:var(--text-dim)">按量计费 · 无月租 · 随时停止</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="/register" class="btn btn-primary">免费注册 →</a>
+        <a href="pricing.html" class="btn btn-ghost">查看定价</a>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-left">
+      <span class="footer-brand">
+        <span style="font-weight:700;color:var(--text-dim)">Sub2API</span>
+        · AI API Relay
+      </span>
+      <div class="footer-links">
+        <a href="index.html">首页</a>
+        <a href="pricing.html">定价</a>
+        <a href="/login">登录</a>
+        <a href="/register">注册</a>
+      </div>
+    </div>
+    <span class="footer-copy">© 2025 Sub2API · All rights reserved</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var curProd = 'codex';
+  var curOS   = 'win';
+
+  var PROD_BLOCKS = {
+    codex: { win: 'codex-win', mac: 'codex-mac' },
+    claude: { win: 'claude-win', mac: 'claude-mac' }
+  };
+
+  var TOC_LABELS = {
+    codex:  'OPENAI CODEX',
+    claude: 'CLAUDE CODE'
+  };
+
+  function update() {
+    // Product tabs
+    document.querySelectorAll('.prod-tab').forEach(function(t) {
+      t.classList.toggle('active', t.dataset.prod === curProd);
+    });
+    // Product blocks
+    document.querySelectorAll('.prod').forEach(function(b) {
+      b.classList.remove('visible');
+    });
+    document.getElementById('prod-' + curProd).classList.add('visible');
+
+    // OS tabs
+    document.querySelectorAll('.os-tab').forEach(function(t) {
+      t.classList.toggle('active', t.dataset.os === curOS);
+    });
+    document.querySelectorAll('.toc-os-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.os === curOS);
+    });
+
+    // Platform blocks within each product
+    Object.keys(PROD_BLOCKS).forEach(function(prod) {
+      var ids = PROD_BLOCKS[prod];
+      Object.keys(ids).forEach(function(os) {
+        var el = document.getElementById(ids[os]);
+        if (el) el.classList.toggle('visible', os === curOS);
+      });
+    });
+
+    // TOC label
+    var tocHead = document.getElementById('toc-prod-head');
+    if (tocHead) tocHead.textContent = TOC_LABELS[curProd];
+
+    // Git prereq link in TOC (only shown for Claude+Windows or Codex+Windows)
+    var prereqLink = document.getElementById('toc-prereq');
+    if (prereqLink) prereqLink.style.display = curOS === 'win' ? '' : 'none';
+
+    // Intro link (only for Codex)
+    var introLink = document.getElementById('toc-intro');
+    if (introLink) introLink.style.display = curProd === 'codex' ? '' : 'none';
+  }
+
+  // Product tab click
+  document.getElementById('prod-tabs').addEventListener('click', function(e) {
+    var btn = e.target.closest('.prod-tab');
+    if (btn) { curProd = btn.dataset.prod; update(); }
+  });
+
+  // OS tab click (main)
+  document.getElementById('os-tabs').addEventListener('click', function(e) {
+    var btn = e.target.closest('.os-tab');
+    if (btn) { curOS = btn.dataset.os; update(); }
+  });
+
+  // OS toggle in TOC sidebar
+  document.getElementById('toc-os-toggle').addEventListener('click', function(e) {
+    var btn = e.target.closest('.toc-os-btn');
+    if (btn) { curOS = btn.dataset.os; update(); }
+  });
+
+  // ── Install method tabs ────────────────────────
+  function bindMtabs(tabsId, methodIds) {
+    var el = document.getElementById(tabsId);
+    if (!el) return;
+    el.addEventListener('click', function(e) {
+      var btn = e.target.closest('.mtab');
+      if (!btn) return;
+      var m = btn.dataset.method;
+      el.querySelectorAll('.mtab').forEach(function(t) { t.classList.remove('active'); });
+      btn.classList.add('active');
+      methodIds.forEach(function(id) {
+        var b = document.getElementById(id);
+        if (b) b.classList.toggle('visible', id === m);
+      });
+    });
+  }
+  bindMtabs('mtabs-clwin',  ['clwin-native', 'clwin-winget', 'clwin-npm']);
+  bindMtabs('mtabs-clmac',  ['clmac-native', 'clmac-brew',   'clmac-npm']);
+
+  // ── Collapsibles ──────────────────────────────
+  document.querySelectorAll('.coll-head').forEach(function(head) {
+    head.addEventListener('click', function() {
+      var bodyId = head.id.replace('head-', 'body-');
+      var body = document.getElementById(bodyId);
+      if (!body) return;
+      head.classList.toggle('open');
+      body.classList.toggle('open');
+    });
+  });
+
+  // ── Copy buttons ──────────────────────────────
+  document.querySelectorAll('.copy-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var el = document.getElementById(this.dataset.target);
+      if (!el) return;
+      var text = el.innerText || el.textContent;
+      var self = this;
+      function done() {
+        self.textContent = 'COPIED ✓'; self.classList.add('copied');
+        setTimeout(function() { self.textContent = 'COPY'; self.classList.remove('copied'); }, 2000);
+      }
+      if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done).catch(done); }
+      else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta); done();
+      }
+    });
+  });
+
+  // ── TOC scroll spy ────────────────────────────
+  var tocLinks = document.querySelectorAll('.toc-a');
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) {
+        var id = e.target.id;
+        tocLinks.forEach(function(a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-70px 0px -60% 0px', threshold: 0 });
+  document.querySelectorAll('.doc-section[id]').forEach(function(s) { io.observe(s); });
+
+  // Initial render
+  update();
+})();
+</script>
+</body>
+</html>

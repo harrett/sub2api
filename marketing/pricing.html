@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>模型定价 — Sub2API</title>
+<meta name="description" content="Sub2API 全模型 API 定价：Claude、OpenAI Codex、Gemini、Grok，透明计费，按 token 付费。" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%239ef01a'/><text x='16' y='22' text-anchor='middle' font-family='monospace' font-size='18' font-weight='bold' fill='%230a0e14'>S</text></svg>" />
+<link rel="stylesheet" href="/site-assets/style.css" />
+<style>
+/* USD / CNY toggle */
+.price-usd { display: inline; }
+.price-cny { display: none; }
+body.cny .price-usd { display: none; }
+body.cny .price-cny { display: inline; }
+
+/* ── Series tabs (underline style) ──────────────── */
+.series-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--line);
+  margin-bottom: 24px; overflow-x: auto;
+}
+.stab {
+  display: flex; align-items: center; gap: 7px; white-space: nowrap;
+  font-family: var(--font-sans); font-size: 14px; font-weight: 600;
+  padding: 10px 22px 10px 0; background: transparent; border: 0;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  color: var(--text-faint); cursor: pointer; outline: none;
+  transition: color .14s, border-color .14s;
+  margin-right: 24px;
+}
+.stab:hover { color: var(--text-dim); }
+.stab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.stab svg { flex-shrink: 0; opacity: .6; }
+.stab.active svg { opacity: 1; }
+
+/* ── Pricing table ──────────────────────────────── */
+.pricing-wrap2 {
+  border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  background: var(--surface-1);
+}
+.pricing-table2 {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--font-mono); font-size: 12.5px;
+}
+.pricing-table2 thead tr {
+  background: var(--surface-2); border-bottom: 1px solid var(--line);
+}
+.pricing-table2 th {
+  padding: 12px 16px; font-size: 11px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-faint); text-align: left;
+}
+.pricing-table2 th.r { text-align: right; }
+.pricing-table2 tbody tr {
+  border-bottom: 1px solid var(--line);
+  transition: background .1s;
+}
+.pricing-table2 tbody tr:last-child { border-bottom: 0; }
+.pricing-table2 tbody tr:hover { background: var(--surface-2); }
+.pricing-table2 td {
+  padding: 13px 16px; vertical-align: middle;
+  color: var(--text-dim);
+}
+.pricing-table2 td.r { text-align: right; }
+.pricing-table2 td.na { color: var(--text-faint); text-align: right; }
+
+/* Model name cell */
+.mn { color: var(--text); font-weight: 600; font-size: 13px; }
+
+/* Discount badge */
+.disc-badge {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0;
+  padding: 1px 5px; border-radius: 3px; margin-left: 6px; vertical-align: 1px;
+  background: rgba(255,91,91,.12); border: 1px solid rgba(255,91,91,.3); color: #ff7070;
+}
+
+/* Discounted price display */
+.price-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.price-orig  { font-size: 11px; color: var(--text-faint); text-decoration: line-through; }
+.price-actual { font-size: 12.5px; color: #ff7070; font-weight: 600; }
+
+/* Normal price */
+.price-norm { color: var(--text-dim); }
+
+/* ── Per-series footnote ─────────────────────────── */
+.series-note {
+  display: none; padding: 14px 0 0;
+  font-size: 12.5px; color: var(--text-faint); line-height: 1.9;
+  font-family: var(--font-mono);
+}
+.series-note.visible { display: block; }
+.series-note a { color: var(--info); text-decoration: underline; text-underline-offset: 2px; }
+.series-note .hl-green { color: var(--accent); font-weight: 600; }
+.series-note .hl-red   { color: #ff7070; font-weight: 600; }
+
+/* Hidden row */
+tr.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <span class="logo-mark">S</span>
+      <span class="logo-text">
+        <span class="logo-name">Sub2API</span>
+        <span class="logo-sub">API Relay</span>
+      </span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html">首页</a>
+      <a href="pricing.html" class="active">定价</a>
+      <a href="docs.html">文档</a>
+    </div>
+    <div class="nav-spacer"></div>
+    <div class="nav-auth">
+      <a href="/login" class="btn btn-ghost btn-sm">登录</a>
+      <a href="/register" class="btn btn-primary btn-sm">免费注册</a>
+    </div>
+  </div>
+</nav>
+
+<!-- PAGE HEADER -->
+<div class="container">
+  <div class="page-header animate">
+    <span class="page-pre">
+      <span class="c">// MODEL PRICING</span><br>
+      <span class="c">// 透明计费 · 价格与官网保持一致 · MTok = 百万 Token</span>
+    </span>
+    <h1 class="page-title">模型定价</h1>
+    <p class="page-sub">按 token 计费，充值即用，无月费。</p>
+  </div>
+
+  <!-- Controls -->
+  <div class="pricing-controls animate d1">
+    <div class="currency-toggle" id="cur-toggle">
+      <button class="cur-btn active" data-cur="usd">USD</button>
+      <button class="cur-btn" data-cur="cny">CNY</button>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint)">
+      <span style="display:inline-block;width:7px;height:7px;border-radius:99px;background:var(--accent);animation:dotPulse 2s infinite;vertical-align:middle;margin-right:6px"></span>
+      实时监控中 · 全模型在线
+    </div>
+  </div>
+</div>
+
+<!-- TABS + TABLE -->
+<div class="container" style="padding-top:0">
+  <div class="animate d2">
+
+    <!-- Series tabs -->
+    <div class="series-tabs" id="series-tabs">
+      <button class="stab" data-series="claude">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.304 1.303C12.653-.093 7.805 2.583 6.41 7.234l-.763 2.62-2.665.37C.406 10.6-1.178 13.97.9 16.697l1.55 2.12-1.017 2.55c-1.67 4.194 1.826 8.588 6.288 7.94l2.701-.39 1.748 2.186c2.839 3.55 8.413 3.152 10.712-.767l1.205-2.078 2.572-.696c4.508-1.222 6.242-6.635 3.23-10.123l-1.73-1.993.538-2.657c.942-4.648-2.437-9.063-7.193-9.486zm-6.246 5.58c1.187-4.077 5.433-6.43 9.51-5.244 3.94 1.148 6.16 5.208 5.018 9.15l-.67 2.306 1.68 1.94c2.322 2.681 1.09 6.861-2.008 7.895l-2.56.693-1.22 2.101c-1.81 3.11-5.97 3.393-8.18.554l-1.7-2.127-2.654.383c-3.416.494-5.87-2.988-4.607-6.172l1.082-2.714-1.538-2.103C2.14 11.21 3.397 7.53 6.471 7.07l2.738-.38z"/></svg>
+        Claude系列
+      </button>
+      <button class="stab active" data-series="codex">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
+        Codex系列
+      </button>
+      <button class="stab" data-series="gemini">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.04 0C4.949 0 0 4.95 0 11.04c0 6.09 4.95 11.04 11.04 11.04 6.09 0 11.04-4.95 11.04-11.04C22.08 4.95 17.13 0 11.04 0zm5.313 6.833L11.04 19.11 5.767 6.833h10.586z"/></svg>
+        Gemini系列
+      </button>
+      <button class="stab" data-series="grok">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        Grok系列
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="pricing-wrap2">
+      <table class="pricing-table2" id="ptable">
+        <thead>
+          <tr>
+            <th style="width:30%">模型</th>
+            <th class="r">Base Input Tokens</th>
+            <th class="r">5m Cache Writes</th>
+            <th class="r">1h Cache Writes</th>
+            <th class="r">Cache Hits &amp; Refreshes</th>
+            <th class="r">Output Tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <!-- ── Claude系列 ─────────────────────── -->
+          <tr data-series="claude">
+            <td><span class="mn">claude-fable-5</span></td>
+            <td class="r price-norm"><span class="price-usd">$17 / MTok</span><span class="price-cny">¥123 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$21.3 / MTok</span><span class="price-cny">¥154 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$34 / MTok</span><span class="price-cny">¥247 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$2 / MTok</span><span class="price-cny">¥14.5 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$85 / MTok</span><span class="price-cny">¥616 / MTok</span></td>
+          </tr>
+          <tr data-series="claude">
+            <td><span class="mn">claude-sonnet-4-6</span></td>
+            <td class="r price-norm"><span class="price-usd">$5 / MTok</span><span class="price-cny">¥36.3 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$6.38 / MTok</span><span class="price-cny">¥46.3 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$10 / MTok</span><span class="price-cny">¥72.5 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.5 / MTok</span><span class="price-cny">¥3.63 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$26 / MTok</span><span class="price-cny">¥189 / MTok</span></td>
+          </tr>
+          <tr data-series="claude">
+            <td><span class="mn">claude-opus-4-8</span></td>
+            <td class="r price-norm"><span class="price-usd">$9 / MTok</span><span class="price-cny">¥65.3 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$10.63 / MTok</span><span class="price-cny">¥77.1 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$17 / MTok</span><span class="price-cny">¥123 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.8 / MTok</span><span class="price-cny">¥5.80 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$43 / MTok</span><span class="price-cny">¥312 / MTok</span></td>
+          </tr>
+          <tr data-series="claude">
+            <td><span class="mn">claude-opus-4-7</span></td>
+            <td class="r price-norm"><span class="price-usd">$9 / MTok</span><span class="price-cny">¥65.3 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$10.63 / MTok</span><span class="price-cny">¥77.1 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$17 / MTok</span><span class="price-cny">¥123 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.8 / MTok</span><span class="price-cny">¥5.80 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$43 / MTok</span><span class="price-cny">¥312 / MTok</span></td>
+          </tr>
+          <tr data-series="claude">
+            <td><span class="mn">claude-opus-4-6</span></td>
+            <td class="r price-norm"><span class="price-usd">$9 / MTok</span><span class="price-cny">¥65.3 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$10.63 / MTok</span><span class="price-cny">¥77.1 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$17 / MTok</span><span class="price-cny">¥123 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.8 / MTok</span><span class="price-cny">¥5.80 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$43 / MTok</span><span class="price-cny">¥312 / MTok</span></td>
+          </tr>
+          <tr data-series="claude">
+            <td><span class="mn">claude-opus-4-5-20251101</span></td>
+            <td class="r price-norm"><span class="price-usd">$9 / MTok</span><span class="price-cny">¥65.3 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$10.63 / MTok</span><span class="price-cny">¥77.1 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$17 / MTok</span><span class="price-cny">¥123 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.8 / MTok</span><span class="price-cny">¥5.80 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$43 / MTok</span><span class="price-cny">¥312 / MTok</span></td>
+          </tr>
+          <tr data-series="claude">
+            <td><span class="mn">claude-haiku-4-5-20251001</span></td>
+            <td class="r price-norm"><span class="price-usd">$2 / MTok</span><span class="price-cny">¥14.5 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$2.13 / MTok</span><span class="price-cny">¥15.4 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$3 / MTok</span><span class="price-cny">¥21.8 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.2 / MTok</span><span class="price-cny">¥1.45 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$9 / MTok</span><span class="price-cny">¥65.3 / MTok</span></td>
+          </tr>
+          <tr data-series="claude">
+            <td><span class="mn">claude-haiku-4-5</span></td>
+            <td class="r price-norm"><span class="price-usd">$2 / MTok</span><span class="price-cny">¥14.5 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$2.13 / MTok</span><span class="price-cny">¥15.4 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$3 / MTok</span><span class="price-cny">¥21.8 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.2 / MTok</span><span class="price-cny">¥1.45 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$9 / MTok</span><span class="price-cny">¥65.3 / MTok</span></td>
+          </tr>
+
+          <!-- ── Codex系列 (GPT-5) ─────────────── -->
+          <tr data-series="codex">
+            <td>
+              <span class="mn">gpt-image-2</span>
+              <span class="disc-badge">8折</span>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$8</span><span class="price-cny">¥58</span></span>
+                <span class="price-actual"><span class="price-usd">$6 / MTok</span><span class="price-cny">¥43.5 / MTok</span></span>
+              </div>
+            </td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$2</span><span class="price-cny">¥14.5</span></span>
+                <span class="price-actual"><span class="price-usd">$2 / MTok</span><span class="price-cny">¥14.5 / MTok</span></span>
+              </div>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$30</span><span class="price-cny">¥218</span></span>
+                <span class="price-actual"><span class="price-usd">$24 / MTok</span><span class="price-cny">¥174 / MTok</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr data-series="codex">
+            <td>
+              <span class="mn">gpt-5.5</span>
+              <span class="disc-badge">8折</span>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$5</span><span class="price-cny">¥36.3</span></span>
+                <span class="price-actual"><span class="price-usd">$4 / MTok</span><span class="price-cny">¥29 / MTok</span></span>
+              </div>
+            </td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$0.5</span><span class="price-cny">¥3.63</span></span>
+                <span class="price-actual"><span class="price-usd">$0.4 / MTok</span><span class="price-cny">¥2.90 / MTok</span></span>
+              </div>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$30</span><span class="price-cny">¥218</span></span>
+                <span class="price-actual"><span class="price-usd">$24 / MTok</span><span class="price-cny">¥174 / MTok</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr data-series="codex">
+            <td>
+              <span class="mn">gpt-5.4</span>
+              <span class="disc-badge">8折</span>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$2.5</span><span class="price-cny">¥18.1</span></span>
+                <span class="price-actual"><span class="price-usd">$2.0 / MTok</span><span class="price-cny">¥14.5 / MTok</span></span>
+              </div>
+            </td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$0.25</span><span class="price-cny">¥1.81</span></span>
+                <span class="price-actual"><span class="price-usd">$0.20 / MTok</span><span class="price-cny">¥1.45 / MTok</span></span>
+              </div>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$15</span><span class="price-cny">¥109</span></span>
+                <span class="price-actual"><span class="price-usd">$12 / MTok</span><span class="price-cny">¥87 / MTok</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr data-series="codex">
+            <td>
+              <span class="mn">gpt-5.3-codex</span>
+              <span class="disc-badge">8折</span>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$1.75</span><span class="price-cny">¥12.7</span></span>
+                <span class="price-actual"><span class="price-usd">$1.40 / MTok</span><span class="price-cny">¥10.2 / MTok</span></span>
+              </div>
+            </td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$0.175</span><span class="price-cny">¥1.27</span></span>
+                <span class="price-actual"><span class="price-usd">$0.140 / MTok</span><span class="price-cny">¥1.02 / MTok</span></span>
+              </div>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$14</span><span class="price-cny">¥102</span></span>
+                <span class="price-actual"><span class="price-usd">$11 / MTok</span><span class="price-cny">¥79.8 / MTok</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr data-series="codex">
+            <td>
+              <span class="mn">gemini-3-pro-image-preview</span>
+              <span class="disc-badge">5折</span>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$2</span><span class="price-cny">¥14.5</span></span>
+                <span class="price-actual"><span class="price-usd">$1 / MTok</span><span class="price-cny">¥7.25 / MTok</span></span>
+              </div>
+            </td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$12</span><span class="price-cny">¥87</span></span>
+                <span class="price-actual"><span class="price-usd">$6 / MTok</span><span class="price-cny">¥43.5 / MTok</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr data-series="codex">
+            <td>
+              <span class="mn">codex-auto-review</span>
+              <span class="disc-badge">8折</span>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$5</span><span class="price-cny">¥36.3</span></span>
+                <span class="price-actual"><span class="price-usd">$4 / MTok</span><span class="price-cny">¥29 / MTok</span></span>
+              </div>
+            </td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$0.5</span><span class="price-cny">¥3.63</span></span>
+                <span class="price-actual"><span class="price-usd">$0.4 / MTok</span><span class="price-cny">¥2.90 / MTok</span></span>
+              </div>
+            </td>
+            <td class="r">
+              <div class="price-cell">
+                <span class="price-orig"><span class="price-usd">$30</span><span class="price-cny">¥218</span></span>
+                <span class="price-actual"><span class="price-usd">$24 / MTok</span><span class="price-cny">¥174 / MTok</span></span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- ── Gemini系列 ─────────────────────── -->
+          <tr data-series="gemini">
+            <td><span class="mn">gemini-2.5-pro</span></td>
+            <td class="r price-norm"><span class="price-usd">$1.25 / MTok</span><span class="price-cny">¥9.06 / MTok</span></td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r price-norm"><span class="price-usd">$0.31 / MTok</span><span class="price-cny">¥2.25 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$10 / MTok</span><span class="price-cny">¥72.5 / MTok</span></td>
+          </tr>
+          <tr data-series="gemini">
+            <td><span class="mn">gemini-2.5-flash</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.15 / MTok</span><span class="price-cny">¥1.09 / MTok</span></td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r price-norm"><span class="price-usd">$0.038 / MTok</span><span class="price-cny">¥0.28 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.60 / MTok</span><span class="price-cny">¥4.35 / MTok</span></td>
+          </tr>
+          <tr data-series="gemini">
+            <td><span class="mn">gemini-3.0-flash</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.10 / MTok</span><span class="price-cny">¥0.73 / MTok</span></td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r price-norm"><span class="price-usd">$0.025 / MTok</span><span class="price-cny">¥0.18 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.40 / MTok</span><span class="price-cny">¥2.90 / MTok</span></td>
+          </tr>
+          <tr data-series="gemini">
+            <td><span class="mn">gemini-2.0-flash</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.10 / MTok</span><span class="price-cny">¥0.73 / MTok</span></td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r price-norm"><span class="price-usd">$0.025 / MTok</span><span class="price-cny">¥0.18 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.40 / MTok</span><span class="price-cny">¥2.90 / MTok</span></td>
+          </tr>
+
+          <!-- ── Grok系列 ───────────────────────── -->
+          <tr data-series="grok">
+            <td><span class="mn">grok-3</span></td>
+            <td class="r price-norm"><span class="price-usd">$3 / MTok</span><span class="price-cny">¥21.8 / MTok</span></td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r price-norm"><span class="price-usd">$0.75 / MTok</span><span class="price-cny">¥5.44 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$15 / MTok</span><span class="price-cny">¥109 / MTok</span></td>
+          </tr>
+          <tr data-series="grok">
+            <td><span class="mn">grok-3-fast</span></td>
+            <td class="r price-norm"><span class="price-usd">$5 / MTok</span><span class="price-cny">¥36.3 / MTok</span></td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r price-norm"><span class="price-usd">$25 / MTok</span><span class="price-cny">¥181 / MTok</span></td>
+          </tr>
+          <tr data-series="grok">
+            <td><span class="mn">grok-3-mini</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.30 / MTok</span><span class="price-cny">¥2.18 / MTok</span></td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r price-norm"><span class="price-usd">$0.075 / MTok</span><span class="price-cny">¥0.54 / MTok</span></td>
+            <td class="r price-norm"><span class="price-usd">$0.50 / MTok</span><span class="price-cny">¥3.63 / MTok</span></td>
+          </tr>
+          <tr data-series="grok">
+            <td><span class="mn">grok-2-vision</span></td>
+            <td class="r price-norm"><span class="price-usd">$2 / MTok</span><span class="price-cny">¥14.5 / MTok</span></td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="na">—</td>
+            <td class="r price-norm"><span class="price-usd">$10 / MTok</span><span class="price-cny">¥72.5 / MTok</span></td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div><!-- /.pricing-wrap2 -->
+
+    <!-- Per-series footnotes -->
+    <div class="series-note" id="note-claude">
+      * MTok = 百万Token | 本服务采取透明计费策略<br>
+      <span class="hl-green">Claude系列：</span> 定价与Claude官网<span class="hl-green">保持一致</span><br>
+      详细定价信息请参考：<a href="https://www.anthropic.com/pricing" target="_blank" rel="noopener">Claude官方定价页面</a>
+    </div>
+    <div class="series-note visible" id="note-codex">
+      * MTok = 百万Token | 本服务采取透明计费策略<br>
+      <span class="hl-red">Codex (GPT-5)：</span> 定价与OpenAI官网<span class="hl-red">保持一致</span><br>
+      详细定价信息请参考：<a href="https://openai.com/api/pricing" target="_blank" rel="noopener">OpenAI官方定价页面</a>
+    </div>
+    <div class="series-note" id="note-gemini">
+      * MTok = 百万Token | 本服务采取透明计费策略<br>
+      <span class="hl-green">Gemini系列：</span> 定价与Google官网<span class="hl-green">保持一致</span><br>
+      详细定价信息请参考：<a href="https://ai.google.dev/pricing" target="_blank" rel="noopener">Google官方定价页面</a>
+    </div>
+    <div class="series-note" id="note-grok">
+      * MTok = 百万Token | 本服务采取透明计费策略<br>
+      <span class="hl-green">Grok系列：</span> 定价与xAI官网<span class="hl-green">保持一致</span><br>
+      详细定价信息请参考：<a href="https://x.ai/api" target="_blank" rel="noopener">xAI官方定价页面</a>
+    </div>
+
+  </div>
+</div>
+
+<!-- CTA -->
+<div style="margin-top:60px">
+  <div class="cta-section">
+    <div class="cta-inner">
+      <div class="cta-mono animate"><span class="accent">$</span> billing --prepay --no-monthly-fee --refundable</div>
+      <h2 class="cta-title animate d1">注册即送免费额度</h2>
+      <p class="cta-sub animate d2">立即注册，充值即用，无隐藏费用。</p>
+      <div class="animate d3">
+        <a href="/register" class="btn btn-primary btn-lg">免费注册 →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-left">
+      <span class="footer-brand">
+        <span style="font-weight:700;color:var(--text-dim)">Sub2API</span>
+        · AI API Relay
+      </span>
+      <div class="footer-links">
+        <a href="index.html">首页</a>
+        <a href="docs.html">文档</a>
+        <a href="/login">登录</a>
+        <a href="/register">注册</a>
+      </div>
+    </div>
+    <span class="footer-copy">© 2025 Sub2API · All rights reserved</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // Currency toggle
+  var curToggle = document.getElementById('cur-toggle');
+  curToggle.addEventListener('click', function (e) {
+    var btn = e.target.closest('.cur-btn');
+    if (!btn) return;
+    curToggle.querySelectorAll('.cur-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.body.classList.toggle('cny', btn.dataset.cur === 'cny');
+  });
+
+  // Series tabs
+  var stabs = document.getElementById('series-tabs');
+  var rows  = document.querySelectorAll('#ptable tbody tr[data-series]');
+  var notes = document.querySelectorAll('.series-note');
+
+  stabs.addEventListener('click', function (e) {
+    var btn = e.target.closest('.stab');
+    if (!btn) return;
+    stabs.querySelectorAll('.stab').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+
+    var s = btn.dataset.series;
+    rows.forEach(function (row) {
+      row.classList.toggle('hidden', row.dataset.series !== s);
+    });
+    notes.forEach(function (n) {
+      n.classList.toggle('visible', n.id === 'note-' + s);
+    });
+  });
+
+  // Default: show codex (already active in HTML)
+  (function () {
+    rows.forEach(function (row) {
+      if (row.dataset.series !== 'codex') row.classList.add('hidden');
+    });
+  })();
+})();
+</script>
+</body>
+</html>

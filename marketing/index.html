@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sub2API — One Key, All AI Models</title>
+<meta name="description" content="Sub2API 是 AI API 中转网关，用一个 API Key 访问 Claude、Gemini、GPT、DeepSeek 等全部主流大模型。" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%239ef01a'/><text x='16' y='22' text-anchor='middle' font-family='monospace' font-size='18' font-weight='bold' fill='%230a0e14'>S</text></svg>" />
+<link rel="stylesheet" href="/site-assets/style.css" />
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <span class="logo-mark">S</span>
+      <span class="logo-text">
+        <span class="logo-name">Sub2API</span>
+        <span class="logo-sub">API Relay</span>
+      </span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="active">首页</a>
+      <a href="pricing.html">定价</a>
+      <a href="docs.html">文档</a>
+    </div>
+    <div class="nav-spacer"></div>
+    <div class="nav-auth">
+      <a href="/login" class="btn btn-ghost btn-sm">登录</a>
+      <a href="/register" class="btn btn-primary btn-sm">免费注册</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+
+    <!-- Terminal window -->
+    <div class="terminal animate">
+      <div class="terminal-bar">
+        <span class="t-dot r"></span>
+        <span class="t-dot y"></span>
+        <span class="t-dot g"></span>
+        <span class="terminal-title">bash — api.sub2api.com</span>
+      </div>
+      <div class="terminal-body">
+        <div class="t-block" style="--d:0s">
+          <span class="t-prompt">$</span> <span class="t-cmd">curl</span> <span class="t-str">https://api.sub2api.com/v1/messages</span> \<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-flag">-H</span> <span class="t-str">"x-api-key: <span class="t-comment">sk-sub2-xK8m••••••••</span>"</span> \<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-flag">-H</span> <span class="t-str">"Content-Type: application/json"</span> \<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-flag">-d</span> <span class="t-str">'{"model":"<span class="t-cmd">claude-opus-4-8</span>","messages":[{"role":"user","content":"<span class="t-comment">你好</span>"}]}'</span>
+        </div>
+        <div class="t-blank"></div>
+        <div class="t-block" style="--d:.9s">
+          <span class="t-status">●</span> <span class="t-dim">Routing to</span> <span class="t-cmd">claude-opus-4-8</span> <span class="t-dim">· latency</span> <span class="t-status">38ms</span>
+        </div>
+        <div class="t-block" style="--d:1.5s">
+          <span class="t-status">●</span> <span class="t-dim">Streaming response</span><span class="t-comment"> ···</span>
+        </div>
+        <div class="t-blank"></div>
+        <div id="t-response" class="t-response t-block" style="--d:2.1s"></div><span class="cursor-blink" id="t-cursor" style="display:none"></span>
+      </div>
+    </div>
+
+    <!-- Title -->
+    <h1 class="hero-title animate d2">
+      One Key.<br><span class="accent">All AI Models.</span>
+    </h1>
+    <p class="hero-sub animate d3">
+      用一个 API Key 同时接入 Claude、Gemini、GPT、DeepSeek 等主流大模型。<br>
+      按量付费，无需订阅，毫秒级路由，会话粘性保障。
+    </p>
+    <div class="hero-cta animate d4">
+      <a href="/register" class="btn btn-primary btn-lg">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1v14M1 8h14"/></svg>
+        免费注册
+      </a>
+      <a href="pricing.html" class="btn btn-ghost btn-lg">查看定价 →</a>
+    </div>
+    <p class="hero-note animate d5">注册即获赠免费额度 · 无需绑卡</p>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" style="border-top:1px solid var(--line)">
+  <div class="container">
+    <div class="section-inner">
+      <span class="section-label animate">功能特性</span>
+      <h2 class="section-title animate d1">为开发者设计的<br>AI API 基础设施</h2>
+      <p class="section-sub animate d2">不再为各平台账号、额度、并发限制烦恼。一个接入点，覆盖全部模型。</p>
+
+      <div class="features-grid">
+        <div class="feature-card animate d1">
+          <div class="feature-cmd">model ls --all</div>
+          <div class="feature-title">全模型覆盖</div>
+          <div class="feature-desc">Claude Opus / Sonnet / Haiku，Gemini Pro / Flash，GPT / Codex，DeepSeek Chat / Reasoner，一个 key 全部搞定。</div>
+        </div>
+        <div class="feature-card animate d2">
+          <div class="feature-cmd">billing --mode pay-as-you-go</div>
+          <div class="feature-title">按量付费</div>
+          <div class="feature-desc">以 token 为粒度计费，用多少花多少，不强制包月。充值余额不过期，实测成本比官方订阅低 60%+。</div>
+        </div>
+        <div class="feature-card animate d3">
+          <div class="feature-cmd">session --sticky --enabled</div>
+          <div class="feature-title">会话粘性路由</div>
+          <div class="feature-desc">多轮对话自动路由至同一账号，保障上下文连贯。动态调度 + RPM 限流防护，账号健康率 99.9%。</div>
+        </div>
+        <div class="feature-card animate d4">
+          <div class="feature-cmd">compat --openai-sdk</div>
+          <div class="feature-title">OpenAI SDK 兼容</div>
+          <div class="feature-desc">修改两行代码（base_url + api_key）即完成迁移，支持 Anthropic SDK、openai 库、任意 HTTP 客户端。</div>
+        </div>
+        <div class="feature-card animate d5">
+          <div class="feature-cmd">stream --sse --real-time</div>
+          <div class="feature-title">实时流式输出</div>
+          <div class="feature-desc">SSE / WebSocket 流式转发，延迟 &lt;100ms，支持 function calling、tool use、vision 多模态。</div>
+        </div>
+        <div class="feature-card animate d6">
+          <div class="feature-cmd">admin --dashboard --24x7</div>
+          <div class="feature-title">完整管理后台</div>
+          <div class="feature-desc">可视化用量统计、子账号管理、Key 权限分级、请求日志查询，随时掌握 API 消耗详情。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MODEL LIST -->
+<section class="section" style="background:var(--surface-1);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="container">
+    <div class="section-inner">
+      <div class="grid-halves">
+        <div>
+          <span class="section-label animate">支持模型</span>
+          <h2 class="section-title animate d1">全主流大模型<br>实时在线</h2>
+          <p class="section-sub animate d2">
+            持续接入业界最新模型，上线即可调用。模型状态实时监控，故障自动切换。
+          </p>
+          <div class="provider-strip animate d3">
+            <span class="provider-badge pb-anthropic"><span class="pb-dot"></span>Anthropic</span>
+            <span class="provider-badge pb-google"><span class="pb-dot"></span>Google</span>
+            <span class="provider-badge pb-openai"><span class="pb-dot"></span>OpenAI</span>
+            <span class="provider-badge pb-deepseek"><span class="pb-dot"></span>DeepSeek</span>
+          </div>
+        </div>
+        <div class="animate d2">
+          <div class="model-terminal">
+            <div class="model-terminal-header">
+              <span class="mth-prompt">$</span>&nbsp;<span class="mth-cmd">model</span>&nbsp;<span class="mth-arg">list --status=online</span>
+            </div>
+            <div class="model-row">
+              <span class="mr-dot live"></span>
+              <span class="mr-name">claude-opus-4-8</span>
+              <span class="mr-provider">anthropic</span>
+              <span class="mr-ctx">200K</span>
+              <span class="mr-status">LIVE</span>
+            </div>
+            <div class="model-row">
+              <span class="mr-dot live"></span>
+              <span class="mr-name">claude-3-7-sonnet</span>
+              <span class="mr-provider">anthropic</span>
+              <span class="mr-ctx">200K</span>
+              <span class="mr-status">LIVE</span>
+            </div>
+            <div class="model-row">
+              <span class="mr-dot live"></span>
+              <span class="mr-name">claude-haiku-4-5</span>
+              <span class="mr-provider">anthropic</span>
+              <span class="mr-ctx">200K</span>
+              <span class="mr-status">LIVE</span>
+            </div>
+            <div class="model-row">
+              <span class="mr-dot live"></span>
+              <span class="mr-name">gemini-2.5-pro</span>
+              <span class="mr-provider">google</span>
+              <span class="mr-ctx">1M</span>
+              <span class="mr-status">LIVE</span>
+            </div>
+            <div class="model-row">
+              <span class="mr-dot live"></span>
+              <span class="mr-name">gemini-2.5-flash</span>
+              <span class="mr-provider">google</span>
+              <span class="mr-ctx">1M</span>
+              <span class="mr-status">LIVE</span>
+            </div>
+            <div class="model-row">
+              <span class="mr-dot live"></span>
+              <span class="mr-name">deepseek-chat</span>
+              <span class="mr-provider">deepseek</span>
+              <span class="mr-ctx">64K</span>
+              <span class="mr-status">LIVE</span>
+            </div>
+            <div class="model-row">
+              <span class="mr-dot live"></span>
+              <span class="mr-name">deepseek-reasoner</span>
+              <span class="mr-provider">deepseek</span>
+              <span class="mr-ctx">64K</span>
+              <span class="mr-status">LIVE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat-item animate">
+      <div class="stat-number"><span class="stat-accent">200</span>K</div>
+      <div class="stat-label">最大上下文窗口</div>
+    </div>
+    <div class="stat-item animate d1">
+      <div class="stat-number"><span class="stat-accent">99.9</span>%</div>
+      <div class="stat-label">服务可用率</div>
+    </div>
+    <div class="stat-item animate d2">
+      <div class="stat-number">&lt;<span class="stat-accent">100</span>ms</div>
+      <div class="stat-label">平均路由延迟</div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="section" style="border-top:1px solid var(--line)">
+  <div class="container">
+    <div class="section-inner">
+      <span class="section-label animate">接入流程</span>
+      <h2 class="section-title animate d1">三步完成接入</h2>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:40px">
+        <div class="feature-card animate d1" style="border-color:var(--accent-dim)">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;color:var(--accent);margin-bottom:14px">STEP 01</div>
+          <div class="feature-title">注册账号</div>
+          <div class="feature-desc">访问 <a href="/register" style="color:var(--accent)">/register</a> 填写邮箱密码，即刻完成注册，无需实名或绑卡。</div>
+        </div>
+        <div class="feature-card animate d2">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;color:var(--text-faint);margin-bottom:14px">STEP 02</div>
+          <div class="feature-title">获取 API Key</div>
+          <div class="feature-desc">登录后在控制台创建 API Key，充值余额，即可开始调用。Key 格式：<code style="font-size:10.5px">sk-sub2-···</code></div>
+        </div>
+        <div class="feature-card animate d3">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;color:var(--text-faint);margin-bottom:14px">STEP 03</div>
+          <div class="feature-title">修改两行代码</div>
+          <div class="feature-desc">将 <code style="font-size:10.5px">base_url</code> 指向本站，<code style="font-size:10.5px">api_key</code> 换为你的 Key，其余代码零改动。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <div class="cta-inner">
+    <div class="cta-mono animate"><span class="accent">$</span> sub2api register --free --no-card-required</div>
+    <h2 class="cta-title animate d1">立即开始，免费体验</h2>
+    <p class="cta-sub animate d2">注册即送免费额度，按量付费，随时可以停止。</p>
+    <div class="animate d3">
+      <a href="/register" class="btn btn-primary btn-lg">免费注册 →</a>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-left">
+      <span class="footer-brand">
+        <span style="font-weight:700;color:var(--text-dim)">Sub2API</span>
+        · AI API Relay
+      </span>
+      <div class="footer-links">
+        <a href="pricing.html">定价</a>
+        <a href="docs.html">文档</a>
+        <a href="/login">登录</a>
+        <a href="/register">注册</a>
+      </div>
+    </div>
+    <span class="footer-copy">© 2025 Sub2API · All rights reserved</span>
+  </div>
+</footer>
+
+<script>
+(function() {
+  // Typewriter for the hero terminal response
+  const response = '您好！我是 Claude，由 Anthropic 训练的 AI 助手。很高兴为您服务，有什么我可以帮助您的吗？';
+  const el = document.getElementById('t-response');
+  const cursor = document.getElementById('t-cursor');
+  let idx = 0, timer;
+
+  function type() {
+    if (!el) return;
+    if (idx === 0) cursor.style.display = 'inline-block';
+    if (idx < response.length) {
+      el.textContent += response[idx++];
+      timer = setTimeout(type, 36);
+    } else {
+      // Restart after pause
+      setTimeout(restart, 3200);
+    }
+  }
+
+  function restart() {
+    idx = 0;
+    el.textContent = '';
+    cursor.style.display = 'none';
+    setTimeout(type, 400);
+  }
+
+  // Start after the last terminal stage fades in (~2.5s total)
+  setTimeout(type, 2500);
+
+  // FAQ accordion (if present)
+  document.querySelectorAll('.faq-q').forEach(q => {
+    q.addEventListener('click', () => q.closest('.faq-item').classList.toggle('open'));
+  });
+})();
+</script>
+</body>
+</html>
