@@ -1,5 +1,5 @@
 # 修改为你的域名
-api.sub2api.com {
+www.onemangicai.com {
         # =========================================================================
 	# 静态资源长期缓存（高优先级，放在最前面）
 	# 带 hash 的文件可以永久缓存，浏览器和 CDN 都会缓存
@@ -28,43 +28,78 @@ api.sub2api.com {
 	}
 
 	# =========================================================================
-	# 反向代理配置
+	# 营销静态站点（首页 / 定价 / 文档）
+	# -------------------------------------------------------------------------
+	# 把宿主机上的 marketing/ 目录部署到 /srv/marketing，由 Caddy 直接 serve。
+	# 仅接管 /, /pricing, /docs 及其 .html 形式 + /site-assets/*；
+	# 其余路径（/home /login /register /assets/* 及所有 API 前缀）继续反代后端。
+	#
+	# 资源前缀用 /site-assets/ 而非 /assets/，避免与 Vue SPA 的 /assets/ 冲突。
+	# style.css 是固定文件名（无 hash），缓存时间设短以便重新部署后及时更新。
 	# =========================================================================
-	reverse_proxy localhost:8080 {
-		# 健康检查
-		health_uri /health
-		health_interval 30s
-		health_timeout 10s
-		health_status 200
-		
-		# 负载均衡策略（单节点可忽略，多节点时有用）
-		lb_policy round_robin
-		lb_try_duration 5s
-		lb_try_interval 250ms
-		
-		# 传递真实客户端信息
-		# 兼容 Cloudflare 和直连：后端应优先读取 CF-Connecting-IP，其次 X-Real-IP
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
-		# 保留 Cloudflare 原始头（如果存在）
-		# 后端获取 IP 的优先级建议: CF-Connecting-IP → X-Real-IP → X-Forwarded-For
-		header_up CF-Connecting-IP {http.request.header.CF-Connecting-IP}
-		
-		# 连接池优化
-		transport http {
-			keepalive 120s
-			keepalive_idle_conns 256
-			read_buffer 16KB
-			write_buffer 16KB
-			compression off
+	handle_path /site-assets/* {
+		root * /srv/marketing/assets
+		file_server
+		header Cache-Control "public, max-age=3600"
+	}
+
+	# 营销页面：根路径默认展示 index.html（替代原 SPA 的 /home 重定向）
+	handle / {
+		root * /srv/marketing
+		rewrite * /index.html
+		file_server
+		header Cache-Control "public, max-age=300"
+	}
+	# 干净 URL（/pricing、/docs）+ 显式 .html 形式都可访问
+	@marketing path /pricing /pricing.html /docs /docs.html /index.html
+	handle @marketing {
+		root * /srv/marketing
+		rewrite /pricing /pricing.html
+		rewrite /docs /docs.html
+		file_server
+		header Cache-Control "public, max-age=300"
+	}
+
+	# =========================================================================
+	# 反向代理配置（其余全部请求 → 后端 SPA + API）
+	# =========================================================================
+	handle {
+		reverse_proxy localhost:8080 {
+			# 健康检查
+			health_uri /health
+			health_interval 30s
+			health_timeout 10s
+			health_status 200
+
+			# 负载均衡策略（单节点可忽略，多节点时有用）
+			lb_policy round_robin
+			lb_try_duration 5s
+			lb_try_interval 250ms
+
+			# 传递真实客户端信息
+			# 兼容 Cloudflare 和直连：后端应优先读取 CF-Connecting-IP，其次 X-Real-IP
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+			# 保留 Cloudflare 原始头（如果存在）
+			# 后端获取 IP 的优先级建议: CF-Connecting-IP → X-Real-IP → X-Forwarded-For
+			header_up CF-Connecting-IP {http.request.header.CF-Connecting-IP}
+
+			# 连接池优化
+			transport http {
+				keepalive 120s
+				keepalive_idle_conns 256
+				read_buffer 16KB
+				write_buffer 16KB
+				compression off
+			}
+
+			# 故障转移
+			fail_duration 30s
+			max_fails 3
+			unhealthy_status 500 502 503 504
 		}
-		
-		# 故障转移
-		fail_duration 30s
-		max_fails 3
-		unhealthy_status 500 502 503 504
 	}
 
 	# =========================================================================
