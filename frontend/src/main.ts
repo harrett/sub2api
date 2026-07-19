@@ -4,6 +4,7 @@ import App from './App.vue'
 import router from './router'
 import i18n, { initI18n } from './i18n'
 import { useAppStore } from '@/stores/app'
+import { updateFavicon } from '@/utils/branding'
 import './style.css'
 // Custom fork UI skin (Instrument / Control Room) — self-hosted fonts + theme overlay.
 // Must be imported AFTER style.css so the overlay wins on source order.
@@ -37,6 +38,7 @@ async function bootstrap() {
   if (appStore.siteName && appStore.siteName !== 'Sub2API') {
     document.title = `${appStore.siteName} - AI API Gateway`
   }
+  updateFavicon(appStore.siteLogo)
 
   await initI18n()
 

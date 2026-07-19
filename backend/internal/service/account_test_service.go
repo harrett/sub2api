@@ -735,11 +735,7 @@ func (s *AccountTestService) testGrokAccountConnection(c *gin.Context, account *
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 	c.Writer.Flush()
 
-	payloadBytes, err := json.Marshal(map[string]any{
-		"model":  testModelID,
-		"input":  "hi",
-		"stream": true,
-	})
+	payloadBytes, err := buildGrokQuotaProbeBody(testModelID)
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create Grok test payload")
 	}
@@ -758,6 +754,8 @@ func (s *AccountTestService) testGrokAccountConnection(c *gin.Context, account *
 	if account.IsGrokOAuth() {
 		applyGrokCLIHeaders(req.Header)
 	}
+	// 连通性测试与真实转发保持同一套账号级请求头覆写。
+	account.ApplyHeaderOverrides(req.Header)
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
