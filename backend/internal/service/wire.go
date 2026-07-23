@@ -780,6 +780,8 @@ var ProviderSet = wire.NewSet(
 	NewAffiliateService,
 	ProvidePaymentConfigService,
 	ProvidePaymentService,
+	ProvideBundleSubscriptionService,
+	ProvideBundleEntitlementResolver,
 	ProvidePaymentOrderExpiryService,
 	ProvideBalanceNotifyService,
 	ProvideChannelMonitorService,
@@ -813,6 +815,14 @@ func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, 
 	svc := NewPaymentService(entClient, registry, loadBalancer, redeemService, subscriptionSvc, configService, userRepo, groupRepo, affiliateService)
 	svc.SetNotificationEmailService(notificationEmailService)
 	return svc
+}
+
+func ProvideBundleSubscriptionService(entClient *dbent.Client, settings *SettingService) *BundleSubscriptionService {
+	return NewBundleSubscriptionService(entClient, settings.IsBundleSubscriptionsEnabled)
+}
+
+func ProvideBundleEntitlementResolver(entClient *dbent.Client, settings *SettingService) *BundleEntitlementResolver {
+	return NewBundleEntitlementResolver(entClient, settings.IsBundleSubscriptionsEnabled)
 }
 
 // ProvidePaymentOrderExpiryService creates and starts PaymentOrderExpiryService.

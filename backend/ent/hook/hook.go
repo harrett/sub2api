@@ -129,6 +129,54 @@ func (f BatchImageJobFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BatchImageJobMutation", m)
 }
 
+// The BundlePlanFunc type is an adapter to allow the use of ordinary
+// function as BundlePlan mutator.
+type BundlePlanFunc func(context.Context, *ent.BundlePlanMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BundlePlanFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BundlePlanMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BundlePlanMutation", m)
+}
+
+// The BundlePlanGroupFunc type is an adapter to allow the use of ordinary
+// function as BundlePlanGroup mutator.
+type BundlePlanGroupFunc func(context.Context, *ent.BundlePlanGroupMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BundlePlanGroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BundlePlanGroupMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BundlePlanGroupMutation", m)
+}
+
+// The BundleSubscriptionFunc type is an adapter to allow the use of ordinary
+// function as BundleSubscription mutator.
+type BundleSubscriptionFunc func(context.Context, *ent.BundleSubscriptionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BundleSubscriptionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BundleSubscriptionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BundleSubscriptionMutation", m)
+}
+
+// The BundleSubscriptionEntitlementFunc type is an adapter to allow the use of ordinary
+// function as BundleSubscriptionEntitlement mutator.
+type BundleSubscriptionEntitlementFunc func(context.Context, *ent.BundleSubscriptionEntitlementMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BundleSubscriptionEntitlementFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BundleSubscriptionEntitlementMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BundleSubscriptionEntitlementMutation", m)
+}
+
 // The ChannelMonitorFunc type is an adapter to allow the use of ordinary
 // function as ChannelMonitor mutator.
 type ChannelMonitorFunc func(context.Context, *ent.ChannelMonitorMutation) (ent.Value, error)

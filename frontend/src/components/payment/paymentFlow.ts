@@ -137,7 +137,11 @@ export function buildCreateOrderPayload(input: BuildCreateOrderPayloadInput): Cr
   }
 
   if (input.planId) {
-    payload.plan_id = input.planId
+    if (input.orderType === 'bundle_subscription') {
+      payload.bundle_plan_id = input.planId
+    } else {
+      payload.plan_id = input.planId
+    }
   }
   if (normalizedOrigin) {
     payload.return_url = `${normalizedOrigin}/payment/result`

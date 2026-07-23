@@ -617,6 +617,192 @@ var (
 			},
 		},
 	}
+	// BundlePlansColumns holds the columns for the "bundle_plans" table.
+	BundlePlansColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "name", Type: field.TypeString, Size: 100},
+		{Name: "description", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "product_name", Type: field.TypeString, Size: 100, Default: ""},
+		{Name: "price", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
+		{Name: "original_price", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
+		{Name: "currency", Type: field.TypeString, Size: 3, Default: "USD"},
+		{Name: "validity_days", Type: field.TypeInt, Default: 30},
+		{Name: "validity_unit", Type: field.TypeString, Size: 10, Default: "day"},
+		{Name: "shared_daily_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "shared_monthly_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "features", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "for_sale", Type: field.TypeBool, Default: true},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// BundlePlansTable holds the schema information for the "bundle_plans" table.
+	BundlePlansTable = &schema.Table{
+		Name:       "bundle_plans",
+		Columns:    BundlePlansColumns,
+		PrimaryKey: []*schema.Column{BundlePlansColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "bundleplan_for_sale",
+				Unique:  false,
+				Columns: []*schema.Column{BundlePlansColumns[12]},
+			},
+			{
+				Name:    "bundleplan_sort_order",
+				Unique:  false,
+				Columns: []*schema.Column{BundlePlansColumns[13]},
+			},
+		},
+	}
+	// BundlePlanGroupsColumns holds the columns for the "bundle_plan_groups" table.
+	BundlePlanGroupsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "daily_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "monthly_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "bundle_plan_id", Type: field.TypeInt64},
+		{Name: "group_id", Type: field.TypeInt64},
+	}
+	// BundlePlanGroupsTable holds the schema information for the "bundle_plan_groups" table.
+	BundlePlanGroupsTable = &schema.Table{
+		Name:       "bundle_plan_groups",
+		Columns:    BundlePlanGroupsColumns,
+		PrimaryKey: []*schema.Column{BundlePlanGroupsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "bundle_plan_groups_bundle_plans_groups",
+				Columns:    []*schema.Column{BundlePlanGroupsColumns[3]},
+				RefColumns: []*schema.Column{BundlePlansColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "bundle_plan_groups_groups_bundle_plan_groups",
+				Columns:    []*schema.Column{BundlePlanGroupsColumns[4]},
+				RefColumns: []*schema.Column{GroupsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "bundleplangroup_bundle_plan_id_group_id",
+				Unique:  true,
+				Columns: []*schema.Column{BundlePlanGroupsColumns[3], BundlePlanGroupsColumns[4]},
+			},
+			{
+				Name:    "bundleplangroup_group_id",
+				Unique:  false,
+				Columns: []*schema.Column{BundlePlanGroupsColumns[4]},
+			},
+		},
+	}
+	// BundleSubscriptionsColumns holds the columns for the "bundle_subscriptions" table.
+	BundleSubscriptionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "pending"},
+		{Name: "starts_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "expires_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "daily_window_start", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "monthly_window_start", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "daily_usage_usd", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "monthly_usage_usd", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "payment_order_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "assigned_by", Type: field.TypeInt64, Nullable: true},
+		{Name: "assigned_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "notes", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "bundle_plan_id", Type: field.TypeInt64},
+		{Name: "user_id", Type: field.TypeInt64},
+	}
+	// BundleSubscriptionsTable holds the schema information for the "bundle_subscriptions" table.
+	BundleSubscriptionsTable = &schema.Table{
+		Name:       "bundle_subscriptions",
+		Columns:    BundleSubscriptionsColumns,
+		PrimaryKey: []*schema.Column{BundleSubscriptionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "bundle_subscriptions_bundle_plans_subscriptions",
+				Columns:    []*schema.Column{BundleSubscriptionsColumns[14]},
+				RefColumns: []*schema.Column{BundlePlansColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "bundle_subscriptions_users_bundle_subscriptions",
+				Columns:    []*schema.Column{BundleSubscriptionsColumns[15]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "bundlesubscription_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{BundleSubscriptionsColumns[15]},
+			},
+			{
+				Name:    "bundlesubscription_bundle_plan_id",
+				Unique:  false,
+				Columns: []*schema.Column{BundleSubscriptionsColumns[14]},
+			},
+			{
+				Name:    "bundlesubscription_status",
+				Unique:  false,
+				Columns: []*schema.Column{BundleSubscriptionsColumns[1]},
+			},
+			{
+				Name:    "bundlesubscription_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{BundleSubscriptionsColumns[3]},
+			},
+			{
+				Name:    "bundlesubscription_user_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{BundleSubscriptionsColumns[15], BundleSubscriptionsColumns[1]},
+			},
+		},
+	}
+	// BundleSubscriptionEntitlementsColumns holds the columns for the "bundle_subscription_entitlements" table.
+	BundleSubscriptionEntitlementsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "platform", Type: field.TypeString, Size: 50},
+		{Name: "daily_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "monthly_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "daily_usage_usd", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "monthly_usage_usd", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "bundle_subscription_id", Type: field.TypeInt64},
+		{Name: "group_id", Type: field.TypeInt64},
+	}
+	// BundleSubscriptionEntitlementsTable holds the schema information for the "bundle_subscription_entitlements" table.
+	BundleSubscriptionEntitlementsTable = &schema.Table{
+		Name:       "bundle_subscription_entitlements",
+		Columns:    BundleSubscriptionEntitlementsColumns,
+		PrimaryKey: []*schema.Column{BundleSubscriptionEntitlementsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "bundle_subscription_entitlements_bundle_subscriptions_entitlements",
+				Columns:    []*schema.Column{BundleSubscriptionEntitlementsColumns[6]},
+				RefColumns: []*schema.Column{BundleSubscriptionsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "bundle_subscription_entitlements_groups_bundle_subscription_entitlements",
+				Columns:    []*schema.Column{BundleSubscriptionEntitlementsColumns[7]},
+				RefColumns: []*schema.Column{GroupsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "bundlesubscriptionentitlement_bundle_subscription_id_group_id",
+				Unique:  true,
+				Columns: []*schema.Column{BundleSubscriptionEntitlementsColumns[6], BundleSubscriptionEntitlementsColumns[7]},
+			},
+			{
+				Name:    "bundlesubscriptionentitlement_group_id_platform",
+				Unique:  false,
+				Columns: []*schema.Column{BundleSubscriptionEntitlementsColumns[7], BundleSubscriptionEntitlementsColumns[1]},
+			},
+		},
+	}
 	// ChannelMonitorsColumns holds the columns for the "channel_monitors" table.
 	ChannelMonitorsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -1114,6 +1300,8 @@ var (
 		{Name: "qr_code_img", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "order_type", Type: field.TypeString, Size: 20, Default: "balance"},
 		{Name: "plan_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "bundle_plan_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "bundle_subscription_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "subscription_group_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "subscription_days", Type: field.TypeInt, Nullable: true},
 		{Name: "provider_instance_id", Type: field.TypeString, Nullable: true, Size: 64},
@@ -1147,7 +1335,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "payment_orders_users_payment_orders",
-				Columns:    []*schema.Column{PaymentOrdersColumns[39]},
+				Columns:    []*schema.Column{PaymentOrdersColumns[41]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1164,32 +1352,32 @@ var (
 			{
 				Name:    "paymentorder_user_id",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[39]},
+				Columns: []*schema.Column{PaymentOrdersColumns[41]},
 			},
 			{
 				Name:    "paymentorder_status",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[21]},
+				Columns: []*schema.Column{PaymentOrdersColumns[23]},
 			},
 			{
 				Name:    "paymentorder_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[29]},
+				Columns: []*schema.Column{PaymentOrdersColumns[31]},
 			},
 			{
 				Name:    "paymentorder_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[37]},
+				Columns: []*schema.Column{PaymentOrdersColumns[39]},
 			},
 			{
 				Name:    "paymentorder_paid_at",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[30]},
+				Columns: []*schema.Column{PaymentOrdersColumns[32]},
 			},
 			{
 				Name:    "paymentorder_payment_type_paid_at",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[9], PaymentOrdersColumns[30]},
+				Columns: []*schema.Column{PaymentOrdersColumns[9], PaymentOrdersColumns[32]},
 			},
 			{
 				Name:    "paymentorder_order_type",
@@ -2072,6 +2260,10 @@ var (
 		BatchImageEventsTable,
 		BatchImageItemsTable,
 		BatchImageJobsTable,
+		BundlePlansTable,
+		BundlePlanGroupsTable,
+		BundleSubscriptionsTable,
+		BundleSubscriptionEntitlementsTable,
 		ChannelMonitorsTable,
 		ChannelMonitorDailyRollupsTable,
 		ChannelMonitorHistoriesTable,
@@ -2144,6 +2336,24 @@ func init() {
 	}
 	BatchImageJobsTable.Annotation = &entsql.Annotation{
 		Table: "batch_image_jobs",
+	}
+	BundlePlansTable.Annotation = &entsql.Annotation{
+		Table: "bundle_plans",
+	}
+	BundlePlanGroupsTable.ForeignKeys[0].RefTable = BundlePlansTable
+	BundlePlanGroupsTable.ForeignKeys[1].RefTable = GroupsTable
+	BundlePlanGroupsTable.Annotation = &entsql.Annotation{
+		Table: "bundle_plan_groups",
+	}
+	BundleSubscriptionsTable.ForeignKeys[0].RefTable = BundlePlansTable
+	BundleSubscriptionsTable.ForeignKeys[1].RefTable = UsersTable
+	BundleSubscriptionsTable.Annotation = &entsql.Annotation{
+		Table: "bundle_subscriptions",
+	}
+	BundleSubscriptionEntitlementsTable.ForeignKeys[0].RefTable = BundleSubscriptionsTable
+	BundleSubscriptionEntitlementsTable.ForeignKeys[1].RefTable = GroupsTable
+	BundleSubscriptionEntitlementsTable.Annotation = &entsql.Annotation{
+		Table: "bundle_subscription_entitlements",
 	}
 	ChannelMonitorsTable.ForeignKeys[0].RefTable = ChannelMonitorRequestTemplatesTable
 	ChannelMonitorsTable.Annotation = &entsql.Annotation{

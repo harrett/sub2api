@@ -177,7 +177,7 @@
                 <CustomSubscriptionPlanCard v-for="plan in checkout.plans" :key="plan.id" :plan="plan" :active-subscriptions="activeSubscriptions" @select="selectPlan" />
               </div>
               <!-- Active subscriptions (compact, below plan list) -->
-              <div v-if="activeSubscriptions.length > 0">
+              <div v-if="!bundleSubscriptionsEnabled && activeSubscriptions.length > 0">
                 <p class="mb-2 text-xs font-medium text-gray-400 dark:text-gray-500">{{ t('payment.activeSubscription') }}</p>
                 <div class="space-y-2">
                   <div v-for="sub in activeSubscriptions" :key="sub.id"
@@ -196,6 +196,20 @@
                     </div>
                     <span class="badge badge-success shrink-0 text-[10px]">{{ t('userSubscriptions.status.active') }}</span>
                   </div>
+                </div>
+              </div>
+              <div v-if="bundleSubscriptionsEnabled && bundleSubscriptions.length > 0" class="space-y-2">
+                <p class="mb-2 text-xs font-medium text-gray-400 dark:text-gray-500">Current bundle contracts</p>
+                <div v-for="sub in bundleSubscriptions" :key="sub.id" class="rounded-xl border border-gray-100 bg-white px-4 py-3 dark:border-dark-700 dark:bg-dark-800">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ sub.plan?.name || `Bundle #${sub.bundle_plan_id}` }}</span>
+                    <span class="badge badge-success text-[10px]">{{ sub.status }}</span>
+                  </div>
+                  <div class="mt-2 grid grid-cols-2 gap-3 text-xs text-gray-500 dark:text-gray-400">
+                    <span>Daily: ${{ sub.daily_usage_usd.toFixed(2) }}<template v-if="sub.plan?.shared_daily_limit_usd != null"> / ${{ sub.plan.shared_daily_limit_usd.toFixed(2) }}</template></span>
+                    <span>Monthly: ${{ sub.monthly_usage_usd.toFixed(2) }}<template v-if="sub.plan?.shared_monthly_limit_usd != null"> / ${{ sub.plan.shared_monthly_limit_usd.toFixed(2) }}</template></span>
+                  </div>
+                  <button v-if="sub.status === 'pending'" class="btn btn-secondary mt-3 w-full text-xs" @click="cancelBundle(sub.id)">Cancel pending change</button>
                 </div>
               </div>
             </template>
@@ -252,6 +266,8 @@ import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiErro
 import { isMobileDevice } from '@/utils/device'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import type { SubscriptionPlan, CheckoutInfoResponse, CreateOrderResult, OrderType } from '@/types/payment'
+import type { BundlePlan } from '@/api/bundleSubscriptions'
+import { bundleSubscriptionsAPI } from '@/api/bundleSubscriptions'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
@@ -276,6 +292,7 @@ import { planValiditySuffix as validitySuffixOf } from '@/components/payment/val
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
 import { hasWechatResumeQuery, parseWechatResumeRoute, stripWechatResumeQuery } from './paymentWechatResume'
+import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -288,6 +305,8 @@ const appStore = useAppStore()
 
 const user = computed(() => authStore.user)
 const activeSubscriptions = computed(() => subscriptionStore.activeSubscriptions)
+const bundleSubscriptionsEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.bundleSubscriptions))
+const bundleSubscriptions = ref<import('@/api/bundleSubscriptions').BundleSubscription[]>([])
 
 function getDaysRemaining(expiresAt: string): number {
   const diff = new Date(expiresAt).getTime() - Date.now()
@@ -433,7 +452,8 @@ function buildWechatOAuthAuthorizeUrl(
     redirectUrl.searchParams.set('order_type', context.orderType)
 
     if (context.planId) {
-      redirectUrl.searchParams.set('plan_id', String(context.planId))
+      redirectUrl.searchParams.set(context.orderType === 'bundle_subscription' ? 'bundle_plan_id' : 'plan_id', String(context.planId))
+      if (context.orderType === 'bundle_subscription') redirectUrl.searchParams.delete('plan_id')
     } else {
       redirectUrl.searchParams.delete('plan_id')
     }
@@ -452,18 +472,19 @@ function buildWechatOAuthAuthorizeUrl(
 }
 
 function onPaymentDone() {
-  const wasSubscription = paymentState.value.orderType === 'subscription'
+	const wasSubscription = paymentState.value.orderType === 'subscription' || paymentState.value.orderType === 'bundle_subscription'
   resetPayment()
   selectedPlan.value = null
   if (wasSubscription) {
     subscriptionStore.fetchActiveSubscriptions(true).catch(() => {})
+    if (bundleSubscriptionsEnabled.value) bundleSubscriptionsAPI.getMine().then((res) => { bundleSubscriptions.value = res.data }).catch(() => {})
   }
 }
 
 function onPaymentSuccess() {
   removeRecoverySnapshot()
   authStore.refreshUser()
-  if (paymentState.value.orderType === 'subscription') {
+  if (paymentState.value.orderType === 'subscription' || paymentState.value.orderType === 'bundle_subscription') {
     subscriptionStore.fetchActiveSubscriptions(true).catch(() => {})
   }
 }
@@ -479,7 +500,10 @@ const checkout = ref<CheckoutInfoResponse>({
 })
 
 const tabs = computed(() => {
-  const result: { key: 'recharge' | 'subscription'; label: string }[] = []
+	if (bundleSubscriptionsEnabled.value) {
+		return [{ key: 'subscription' as const, label: t('payment.tabSubscribe') }]
+	}
+	const result: { key: 'recharge' | 'subscription'; label: string }[] = []
   if (!checkout.value.balance_disabled) result.push({ key: 'recharge', label: t('payment.tabTopUp') })
   result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
   return result
@@ -720,6 +744,38 @@ function selectPlanFromModal(plan: SubscriptionPlan) {
   errorMessage.value = ''
 }
 
+function bundlePlanAsSubscriptionPlan(plan: BundlePlan): SubscriptionPlan {
+  const firstGroup = plan.groups?.[0]
+  const groupLabel = plan.groups?.map((group) => group.platform || group.group_name || `Group #${group.group_id}`).join(', ')
+  return {
+    id: plan.id,
+    group_id: firstGroup?.group_id || 0,
+    group_platform: groupLabel || 'bundle',
+    group_name: groupLabel || plan.product_name || plan.name,
+    name: plan.name,
+    description: plan.description || groupLabel || 'Cross-platform shared quota plan',
+    price: plan.price,
+    original_price: plan.original_price ?? undefined,
+    currency: plan.currency,
+    validity_days: plan.validity_days,
+    validity_unit: plan.validity_unit,
+    features: plan.features ? [plan.features] : [],
+    for_sale: plan.for_sale,
+    sort_order: plan.sort_order,
+    daily_limit_usd: plan.shared_daily_limit_usd,
+    monthly_limit_usd: plan.shared_monthly_limit_usd,
+  }
+}
+
+async function cancelBundle(id: number) {
+  try {
+    await bundleSubscriptionsAPI.cancelPending(id)
+    bundleSubscriptions.value = bundleSubscriptions.value.map((sub) => sub.id === id ? { ...sub, status: 'revoked' } : sub)
+  } catch (err) {
+    appStore.showError(extractApiErrorMessage(err, t('common.error')))
+  }
+}
+
 function closeRenewalModal() {
   showRenewalModal.value = false
   renewGroupId.value = null
@@ -732,7 +788,7 @@ async function handleSubmitRecharge() {
 
 async function confirmSubscribe() {
   if (!selectedPlan.value || submitting.value) return
-  await createOrder(selectedPlan.value.price, 'subscription', selectedPlan.value.id)
+  await createOrder(selectedPlan.value.price, bundleSubscriptionsEnabled.value ? 'bundle_subscription' : 'subscription', selectedPlan.value.id)
 }
 
 async function createOrder(orderAmount: number, orderType: OrderType, planId?: number, options: CreateOrderOptions = {}) {
@@ -1041,7 +1097,7 @@ async function resumeWechatPaymentFromQuery() {
   if (resume.orderType === 'balance' && resume.orderAmount > 0) {
     amount.value = resume.orderAmount
   }
-  if (resume.orderType === 'subscription' && resume.planId) {
+  if ((resume.orderType === 'subscription' || resume.orderType === 'bundle_subscription') && resume.planId) {
     selectedPlan.value = checkout.value.plans.find(plan => plan.id === resume.planId) ?? null
   }
 
@@ -1069,6 +1125,12 @@ onMounted(async () => {
   try {
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
+    if (bundleSubscriptionsEnabled.value) {
+      const bundleResult = await bundleSubscriptionsAPI.getPlans()
+      checkout.value = { ...checkout.value, plans: bundleResult.data.map(bundlePlanAsSubscriptionPlan) }
+      const mine = await bundleSubscriptionsAPI.getMine()
+      bundleSubscriptions.value = mine.data
+    }
     if (enabledMethods.value.length) {
       const order: readonly string[] = METHOD_ORDER
       const sorted = [...enabledMethods.value].sort((a, b) => {
@@ -1104,7 +1166,7 @@ onMounted(async () => {
       }
     }
     await resumeWechatPaymentFromQuery()
-    if (checkout.value.balance_disabled) {
+    if (checkout.value.balance_disabled || bundleSubscriptionsEnabled.value) {
       activeTab.value = 'subscription'
     }
     // Handle renewal navigation: ?tab=subscription&group=123

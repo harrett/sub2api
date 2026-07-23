@@ -35,6 +35,22 @@ describe('parseWechatResumeRoute', () => {
       planId: undefined,
     })
   })
+
+  it('restores bundle orders from bundle_plan_id', () => {
+    expect(parseWechatResumeRoute({
+      wechat_resume: '1',
+      openid: 'openid-123',
+      payment_type: 'wxpay',
+      order_type: 'bundle_subscription',
+      bundle_plan_id: '42',
+    }, [], 88)).toEqual({
+      openid: 'openid-123',
+      paymentType: 'wxpay',
+      orderType: 'bundle_subscription',
+      orderAmount: 0,
+      planId: 42,
+    })
+  })
 })
 
 describe('stripWechatResumeQuery', () => {
@@ -48,6 +64,7 @@ describe('stripWechatResumeQuery', () => {
       amount: '12.5',
       order_type: 'subscription',
       plan_id: '7',
+      bundle_plan_id: '42',
       state: 'state-123',
       scope: 'snsapi_base',
     })).toEqual({

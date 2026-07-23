@@ -179,6 +179,7 @@ func ProvideHandlers(
 	totpHandler *TotpHandler,
 	paymentHandler *PaymentHandler,
 	paymentWebhookHandler *PaymentWebhookHandler,
+	bundleSubscriptionHandler *BundleSubscriptionHandler,
 	availableChannelHandler *AvailableChannelHandler,
 	asyncImageHandler *AsyncImageHandler,
 	batchImageHandler *BatchImageHandler,
@@ -186,25 +187,31 @@ func ProvideHandlers(
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
 	return &Handlers{
-		Auth:             authHandler,
-		User:             userHandler,
-		APIKey:           apiKeyHandler,
-		Usage:            usageHandler,
-		Redeem:           redeemHandler,
-		Subscription:     subscriptionHandler,
-		Announcement:     announcementHandler,
-		ChannelMonitor:   channelMonitorUserHandler,
-		Admin:            adminHandlers,
-		Gateway:          gatewayHandler,
-		OpenAIGateway:    openaiGatewayHandler,
-		Setting:          settingHandler,
-		Totp:             totpHandler,
-		Payment:          paymentHandler,
-		PaymentWebhook:   paymentWebhookHandler,
-		AvailableChannel: availableChannelHandler,
-		AsyncImage:       asyncImageHandler,
-		BatchImage:       batchImageHandler,
+		Auth:               authHandler,
+		User:               userHandler,
+		APIKey:             apiKeyHandler,
+		Usage:              usageHandler,
+		Redeem:             redeemHandler,
+		Subscription:       subscriptionHandler,
+		Announcement:       announcementHandler,
+		ChannelMonitor:     channelMonitorUserHandler,
+		Admin:              adminHandlers,
+		Gateway:            gatewayHandler,
+		OpenAIGateway:      openaiGatewayHandler,
+		Setting:            settingHandler,
+		Totp:               totpHandler,
+		Payment:            paymentHandler,
+		PaymentWebhook:     paymentWebhookHandler,
+		BundleSubscription: bundleSubscriptionHandler,
+		AvailableChannel:   availableChannelHandler,
+		AsyncImage:         asyncImageHandler,
+		BatchImage:         batchImageHandler,
 	}
+}
+
+func ProvideBundleSubscriptionHandler(bundleSvc *service.BundleSubscriptionService, paymentSvc *service.PaymentService) *BundleSubscriptionHandler {
+	paymentSvc.SetBundleSubscriptionService(bundleSvc)
+	return NewBundleSubscriptionHandler(bundleSvc)
 }
 
 // ProviderSet is the Wire provider set for all handlers
@@ -224,6 +231,7 @@ var ProviderSet = wire.NewSet(
 	ProvideSettingHandler,
 	NewPaymentHandler,
 	NewPaymentWebhookHandler,
+	ProvideBundleSubscriptionHandler,
 	NewAvailableChannelHandler,
 	NewAsyncImageHandler,
 	ProvideBatchImageHandler,

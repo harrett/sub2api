@@ -25,6 +25,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/batchimageevent"
 	"github.com/Wei-Shaw/sub2api/ent/batchimageitem"
 	"github.com/Wei-Shaw/sub2api/ent/batchimagejob"
+	"github.com/Wei-Shaw/sub2api/ent/bundleplan"
+	"github.com/Wei-Shaw/sub2api/ent/bundleplangroup"
+	"github.com/Wei-Shaw/sub2api/ent/bundlesubscription"
+	"github.com/Wei-Shaw/sub2api/ent/bundlesubscriptionentitlement"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -83,6 +87,14 @@ type Client struct {
 	BatchImageItem *BatchImageItemClient
 	// BatchImageJob is the client for interacting with the BatchImageJob builders.
 	BatchImageJob *BatchImageJobClient
+	// BundlePlan is the client for interacting with the BundlePlan builders.
+	BundlePlan *BundlePlanClient
+	// BundlePlanGroup is the client for interacting with the BundlePlanGroup builders.
+	BundlePlanGroup *BundlePlanGroupClient
+	// BundleSubscription is the client for interacting with the BundleSubscription builders.
+	BundleSubscription *BundleSubscriptionClient
+	// BundleSubscriptionEntitlement is the client for interacting with the BundleSubscriptionEntitlement builders.
+	BundleSubscriptionEntitlement *BundleSubscriptionEntitlementClient
 	// ChannelMonitor is the client for interacting with the ChannelMonitor builders.
 	ChannelMonitor *ChannelMonitorClient
 	// ChannelMonitorDailyRollup is the client for interacting with the ChannelMonitorDailyRollup builders.
@@ -162,6 +174,10 @@ func (c *Client) init() {
 	c.BatchImageEvent = NewBatchImageEventClient(c.config)
 	c.BatchImageItem = NewBatchImageItemClient(c.config)
 	c.BatchImageJob = NewBatchImageJobClient(c.config)
+	c.BundlePlan = NewBundlePlanClient(c.config)
+	c.BundlePlanGroup = NewBundlePlanGroupClient(c.config)
+	c.BundleSubscription = NewBundleSubscriptionClient(c.config)
+	c.BundleSubscriptionEntitlement = NewBundleSubscriptionEntitlementClient(c.config)
 	c.ChannelMonitor = NewChannelMonitorClient(c.config)
 	c.ChannelMonitorDailyRollup = NewChannelMonitorDailyRollupClient(c.config)
 	c.ChannelMonitorHistory = NewChannelMonitorHistoryClient(c.config)
@@ -293,6 +309,10 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		BatchImageEvent:               NewBatchImageEventClient(cfg),
 		BatchImageItem:                NewBatchImageItemClient(cfg),
 		BatchImageJob:                 NewBatchImageJobClient(cfg),
+		BundlePlan:                    NewBundlePlanClient(cfg),
+		BundlePlanGroup:               NewBundlePlanGroupClient(cfg),
+		BundleSubscription:            NewBundleSubscriptionClient(cfg),
+		BundleSubscriptionEntitlement: NewBundleSubscriptionEntitlementClient(cfg),
 		ChannelMonitor:                NewChannelMonitorClient(cfg),
 		ChannelMonitorDailyRollup:     NewChannelMonitorDailyRollupClient(cfg),
 		ChannelMonitorHistory:         NewChannelMonitorHistoryClient(cfg),
@@ -351,6 +371,10 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		BatchImageEvent:               NewBatchImageEventClient(cfg),
 		BatchImageItem:                NewBatchImageItemClient(cfg),
 		BatchImageJob:                 NewBatchImageJobClient(cfg),
+		BundlePlan:                    NewBundlePlanClient(cfg),
+		BundlePlanGroup:               NewBundlePlanGroupClient(cfg),
+		BundleSubscription:            NewBundleSubscriptionClient(cfg),
+		BundleSubscriptionEntitlement: NewBundleSubscriptionEntitlementClient(cfg),
 		ChannelMonitor:                NewChannelMonitorClient(cfg),
 		ChannelMonitorDailyRollup:     NewChannelMonitorDailyRollupClient(cfg),
 		ChannelMonitorHistory:         NewChannelMonitorHistoryClient(cfg),
@@ -411,7 +435,8 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
 		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
+		c.BatchImageJob, c.BundlePlan, c.BundlePlanGroup, c.BundleSubscription,
+		c.BundleSubscriptionEntitlement, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
 		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
 		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
 		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
@@ -431,7 +456,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
 		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
+		c.BatchImageJob, c.BundlePlan, c.BundlePlanGroup, c.BundleSubscription,
+		c.BundleSubscriptionEntitlement, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
 		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
 		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
 		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
@@ -468,6 +494,14 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BatchImageItem.mutate(ctx, m)
 	case *BatchImageJobMutation:
 		return c.BatchImageJob.mutate(ctx, m)
+	case *BundlePlanMutation:
+		return c.BundlePlan.mutate(ctx, m)
+	case *BundlePlanGroupMutation:
+		return c.BundlePlanGroup.mutate(ctx, m)
+	case *BundleSubscriptionMutation:
+		return c.BundleSubscription.mutate(ctx, m)
+	case *BundleSubscriptionEntitlementMutation:
+		return c.BundleSubscriptionEntitlement.mutate(ctx, m)
 	case *ChannelMonitorMutation:
 		return c.ChannelMonitor.mutate(ctx, m)
 	case *ChannelMonitorDailyRollupMutation:
@@ -2104,6 +2138,682 @@ func (c *BatchImageJobClient) mutate(ctx context.Context, m *BatchImageJobMutati
 	}
 }
 
+// BundlePlanClient is a client for the BundlePlan schema.
+type BundlePlanClient struct {
+	config
+}
+
+// NewBundlePlanClient returns a client for the BundlePlan from the given config.
+func NewBundlePlanClient(c config) *BundlePlanClient {
+	return &BundlePlanClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `bundleplan.Hooks(f(g(h())))`.
+func (c *BundlePlanClient) Use(hooks ...Hook) {
+	c.hooks.BundlePlan = append(c.hooks.BundlePlan, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `bundleplan.Intercept(f(g(h())))`.
+func (c *BundlePlanClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BundlePlan = append(c.inters.BundlePlan, interceptors...)
+}
+
+// Create returns a builder for creating a BundlePlan entity.
+func (c *BundlePlanClient) Create() *BundlePlanCreate {
+	mutation := newBundlePlanMutation(c.config, OpCreate)
+	return &BundlePlanCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BundlePlan entities.
+func (c *BundlePlanClient) CreateBulk(builders ...*BundlePlanCreate) *BundlePlanCreateBulk {
+	return &BundlePlanCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BundlePlanClient) MapCreateBulk(slice any, setFunc func(*BundlePlanCreate, int)) *BundlePlanCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BundlePlanCreateBulk{err: fmt.Errorf("calling to BundlePlanClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BundlePlanCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BundlePlanCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BundlePlan.
+func (c *BundlePlanClient) Update() *BundlePlanUpdate {
+	mutation := newBundlePlanMutation(c.config, OpUpdate)
+	return &BundlePlanUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BundlePlanClient) UpdateOne(_m *BundlePlan) *BundlePlanUpdateOne {
+	mutation := newBundlePlanMutation(c.config, OpUpdateOne, withBundlePlan(_m))
+	return &BundlePlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BundlePlanClient) UpdateOneID(id int64) *BundlePlanUpdateOne {
+	mutation := newBundlePlanMutation(c.config, OpUpdateOne, withBundlePlanID(id))
+	return &BundlePlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BundlePlan.
+func (c *BundlePlanClient) Delete() *BundlePlanDelete {
+	mutation := newBundlePlanMutation(c.config, OpDelete)
+	return &BundlePlanDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BundlePlanClient) DeleteOne(_m *BundlePlan) *BundlePlanDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BundlePlanClient) DeleteOneID(id int64) *BundlePlanDeleteOne {
+	builder := c.Delete().Where(bundleplan.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BundlePlanDeleteOne{builder}
+}
+
+// Query returns a query builder for BundlePlan.
+func (c *BundlePlanClient) Query() *BundlePlanQuery {
+	return &BundlePlanQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBundlePlan},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BundlePlan entity by its id.
+func (c *BundlePlanClient) Get(ctx context.Context, id int64) (*BundlePlan, error) {
+	return c.Query().Where(bundleplan.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BundlePlanClient) GetX(ctx context.Context, id int64) *BundlePlan {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryGroups queries the groups edge of a BundlePlan.
+func (c *BundlePlanClient) QueryGroups(_m *BundlePlan) *BundlePlanGroupQuery {
+	query := (&BundlePlanGroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundleplan.Table, bundleplan.FieldID, id),
+			sqlgraph.To(bundleplangroup.Table, bundleplangroup.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, bundleplan.GroupsTable, bundleplan.GroupsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySubscriptions queries the subscriptions edge of a BundlePlan.
+func (c *BundlePlanClient) QuerySubscriptions(_m *BundlePlan) *BundleSubscriptionQuery {
+	query := (&BundleSubscriptionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundleplan.Table, bundleplan.FieldID, id),
+			sqlgraph.To(bundlesubscription.Table, bundlesubscription.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, bundleplan.SubscriptionsTable, bundleplan.SubscriptionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *BundlePlanClient) Hooks() []Hook {
+	return c.hooks.BundlePlan
+}
+
+// Interceptors returns the client interceptors.
+func (c *BundlePlanClient) Interceptors() []Interceptor {
+	return c.inters.BundlePlan
+}
+
+func (c *BundlePlanClient) mutate(ctx context.Context, m *BundlePlanMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BundlePlanCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BundlePlanUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BundlePlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BundlePlanDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BundlePlan mutation op: %q", m.Op())
+	}
+}
+
+// BundlePlanGroupClient is a client for the BundlePlanGroup schema.
+type BundlePlanGroupClient struct {
+	config
+}
+
+// NewBundlePlanGroupClient returns a client for the BundlePlanGroup from the given config.
+func NewBundlePlanGroupClient(c config) *BundlePlanGroupClient {
+	return &BundlePlanGroupClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `bundleplangroup.Hooks(f(g(h())))`.
+func (c *BundlePlanGroupClient) Use(hooks ...Hook) {
+	c.hooks.BundlePlanGroup = append(c.hooks.BundlePlanGroup, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `bundleplangroup.Intercept(f(g(h())))`.
+func (c *BundlePlanGroupClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BundlePlanGroup = append(c.inters.BundlePlanGroup, interceptors...)
+}
+
+// Create returns a builder for creating a BundlePlanGroup entity.
+func (c *BundlePlanGroupClient) Create() *BundlePlanGroupCreate {
+	mutation := newBundlePlanGroupMutation(c.config, OpCreate)
+	return &BundlePlanGroupCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BundlePlanGroup entities.
+func (c *BundlePlanGroupClient) CreateBulk(builders ...*BundlePlanGroupCreate) *BundlePlanGroupCreateBulk {
+	return &BundlePlanGroupCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BundlePlanGroupClient) MapCreateBulk(slice any, setFunc func(*BundlePlanGroupCreate, int)) *BundlePlanGroupCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BundlePlanGroupCreateBulk{err: fmt.Errorf("calling to BundlePlanGroupClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BundlePlanGroupCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BundlePlanGroupCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BundlePlanGroup.
+func (c *BundlePlanGroupClient) Update() *BundlePlanGroupUpdate {
+	mutation := newBundlePlanGroupMutation(c.config, OpUpdate)
+	return &BundlePlanGroupUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BundlePlanGroupClient) UpdateOne(_m *BundlePlanGroup) *BundlePlanGroupUpdateOne {
+	mutation := newBundlePlanGroupMutation(c.config, OpUpdateOne, withBundlePlanGroup(_m))
+	return &BundlePlanGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BundlePlanGroupClient) UpdateOneID(id int64) *BundlePlanGroupUpdateOne {
+	mutation := newBundlePlanGroupMutation(c.config, OpUpdateOne, withBundlePlanGroupID(id))
+	return &BundlePlanGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BundlePlanGroup.
+func (c *BundlePlanGroupClient) Delete() *BundlePlanGroupDelete {
+	mutation := newBundlePlanGroupMutation(c.config, OpDelete)
+	return &BundlePlanGroupDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BundlePlanGroupClient) DeleteOne(_m *BundlePlanGroup) *BundlePlanGroupDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BundlePlanGroupClient) DeleteOneID(id int64) *BundlePlanGroupDeleteOne {
+	builder := c.Delete().Where(bundleplangroup.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BundlePlanGroupDeleteOne{builder}
+}
+
+// Query returns a query builder for BundlePlanGroup.
+func (c *BundlePlanGroupClient) Query() *BundlePlanGroupQuery {
+	return &BundlePlanGroupQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBundlePlanGroup},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BundlePlanGroup entity by its id.
+func (c *BundlePlanGroupClient) Get(ctx context.Context, id int64) (*BundlePlanGroup, error) {
+	return c.Query().Where(bundleplangroup.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BundlePlanGroupClient) GetX(ctx context.Context, id int64) *BundlePlanGroup {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPlan queries the plan edge of a BundlePlanGroup.
+func (c *BundlePlanGroupClient) QueryPlan(_m *BundlePlanGroup) *BundlePlanQuery {
+	query := (&BundlePlanClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundleplangroup.Table, bundleplangroup.FieldID, id),
+			sqlgraph.To(bundleplan.Table, bundleplan.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, bundleplangroup.PlanTable, bundleplangroup.PlanColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryGroup queries the group edge of a BundlePlanGroup.
+func (c *BundlePlanGroupClient) QueryGroup(_m *BundlePlanGroup) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundleplangroup.Table, bundleplangroup.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, bundleplangroup.GroupTable, bundleplangroup.GroupColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *BundlePlanGroupClient) Hooks() []Hook {
+	return c.hooks.BundlePlanGroup
+}
+
+// Interceptors returns the client interceptors.
+func (c *BundlePlanGroupClient) Interceptors() []Interceptor {
+	return c.inters.BundlePlanGroup
+}
+
+func (c *BundlePlanGroupClient) mutate(ctx context.Context, m *BundlePlanGroupMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BundlePlanGroupCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BundlePlanGroupUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BundlePlanGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BundlePlanGroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BundlePlanGroup mutation op: %q", m.Op())
+	}
+}
+
+// BundleSubscriptionClient is a client for the BundleSubscription schema.
+type BundleSubscriptionClient struct {
+	config
+}
+
+// NewBundleSubscriptionClient returns a client for the BundleSubscription from the given config.
+func NewBundleSubscriptionClient(c config) *BundleSubscriptionClient {
+	return &BundleSubscriptionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `bundlesubscription.Hooks(f(g(h())))`.
+func (c *BundleSubscriptionClient) Use(hooks ...Hook) {
+	c.hooks.BundleSubscription = append(c.hooks.BundleSubscription, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `bundlesubscription.Intercept(f(g(h())))`.
+func (c *BundleSubscriptionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BundleSubscription = append(c.inters.BundleSubscription, interceptors...)
+}
+
+// Create returns a builder for creating a BundleSubscription entity.
+func (c *BundleSubscriptionClient) Create() *BundleSubscriptionCreate {
+	mutation := newBundleSubscriptionMutation(c.config, OpCreate)
+	return &BundleSubscriptionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BundleSubscription entities.
+func (c *BundleSubscriptionClient) CreateBulk(builders ...*BundleSubscriptionCreate) *BundleSubscriptionCreateBulk {
+	return &BundleSubscriptionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BundleSubscriptionClient) MapCreateBulk(slice any, setFunc func(*BundleSubscriptionCreate, int)) *BundleSubscriptionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BundleSubscriptionCreateBulk{err: fmt.Errorf("calling to BundleSubscriptionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BundleSubscriptionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BundleSubscriptionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BundleSubscription.
+func (c *BundleSubscriptionClient) Update() *BundleSubscriptionUpdate {
+	mutation := newBundleSubscriptionMutation(c.config, OpUpdate)
+	return &BundleSubscriptionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BundleSubscriptionClient) UpdateOne(_m *BundleSubscription) *BundleSubscriptionUpdateOne {
+	mutation := newBundleSubscriptionMutation(c.config, OpUpdateOne, withBundleSubscription(_m))
+	return &BundleSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BundleSubscriptionClient) UpdateOneID(id int64) *BundleSubscriptionUpdateOne {
+	mutation := newBundleSubscriptionMutation(c.config, OpUpdateOne, withBundleSubscriptionID(id))
+	return &BundleSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BundleSubscription.
+func (c *BundleSubscriptionClient) Delete() *BundleSubscriptionDelete {
+	mutation := newBundleSubscriptionMutation(c.config, OpDelete)
+	return &BundleSubscriptionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BundleSubscriptionClient) DeleteOne(_m *BundleSubscription) *BundleSubscriptionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BundleSubscriptionClient) DeleteOneID(id int64) *BundleSubscriptionDeleteOne {
+	builder := c.Delete().Where(bundlesubscription.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BundleSubscriptionDeleteOne{builder}
+}
+
+// Query returns a query builder for BundleSubscription.
+func (c *BundleSubscriptionClient) Query() *BundleSubscriptionQuery {
+	return &BundleSubscriptionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBundleSubscription},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BundleSubscription entity by its id.
+func (c *BundleSubscriptionClient) Get(ctx context.Context, id int64) (*BundleSubscription, error) {
+	return c.Query().Where(bundlesubscription.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BundleSubscriptionClient) GetX(ctx context.Context, id int64) *BundleSubscription {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a BundleSubscription.
+func (c *BundleSubscriptionClient) QueryUser(_m *BundleSubscription) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundlesubscription.Table, bundlesubscription.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, bundlesubscription.UserTable, bundlesubscription.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPlan queries the plan edge of a BundleSubscription.
+func (c *BundleSubscriptionClient) QueryPlan(_m *BundleSubscription) *BundlePlanQuery {
+	query := (&BundlePlanClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundlesubscription.Table, bundlesubscription.FieldID, id),
+			sqlgraph.To(bundleplan.Table, bundleplan.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, bundlesubscription.PlanTable, bundlesubscription.PlanColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryEntitlements queries the entitlements edge of a BundleSubscription.
+func (c *BundleSubscriptionClient) QueryEntitlements(_m *BundleSubscription) *BundleSubscriptionEntitlementQuery {
+	query := (&BundleSubscriptionEntitlementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundlesubscription.Table, bundlesubscription.FieldID, id),
+			sqlgraph.To(bundlesubscriptionentitlement.Table, bundlesubscriptionentitlement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, bundlesubscription.EntitlementsTable, bundlesubscription.EntitlementsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *BundleSubscriptionClient) Hooks() []Hook {
+	return c.hooks.BundleSubscription
+}
+
+// Interceptors returns the client interceptors.
+func (c *BundleSubscriptionClient) Interceptors() []Interceptor {
+	return c.inters.BundleSubscription
+}
+
+func (c *BundleSubscriptionClient) mutate(ctx context.Context, m *BundleSubscriptionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BundleSubscriptionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BundleSubscriptionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BundleSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BundleSubscriptionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BundleSubscription mutation op: %q", m.Op())
+	}
+}
+
+// BundleSubscriptionEntitlementClient is a client for the BundleSubscriptionEntitlement schema.
+type BundleSubscriptionEntitlementClient struct {
+	config
+}
+
+// NewBundleSubscriptionEntitlementClient returns a client for the BundleSubscriptionEntitlement from the given config.
+func NewBundleSubscriptionEntitlementClient(c config) *BundleSubscriptionEntitlementClient {
+	return &BundleSubscriptionEntitlementClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `bundlesubscriptionentitlement.Hooks(f(g(h())))`.
+func (c *BundleSubscriptionEntitlementClient) Use(hooks ...Hook) {
+	c.hooks.BundleSubscriptionEntitlement = append(c.hooks.BundleSubscriptionEntitlement, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `bundlesubscriptionentitlement.Intercept(f(g(h())))`.
+func (c *BundleSubscriptionEntitlementClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BundleSubscriptionEntitlement = append(c.inters.BundleSubscriptionEntitlement, interceptors...)
+}
+
+// Create returns a builder for creating a BundleSubscriptionEntitlement entity.
+func (c *BundleSubscriptionEntitlementClient) Create() *BundleSubscriptionEntitlementCreate {
+	mutation := newBundleSubscriptionEntitlementMutation(c.config, OpCreate)
+	return &BundleSubscriptionEntitlementCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BundleSubscriptionEntitlement entities.
+func (c *BundleSubscriptionEntitlementClient) CreateBulk(builders ...*BundleSubscriptionEntitlementCreate) *BundleSubscriptionEntitlementCreateBulk {
+	return &BundleSubscriptionEntitlementCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BundleSubscriptionEntitlementClient) MapCreateBulk(slice any, setFunc func(*BundleSubscriptionEntitlementCreate, int)) *BundleSubscriptionEntitlementCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BundleSubscriptionEntitlementCreateBulk{err: fmt.Errorf("calling to BundleSubscriptionEntitlementClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BundleSubscriptionEntitlementCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BundleSubscriptionEntitlementCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BundleSubscriptionEntitlement.
+func (c *BundleSubscriptionEntitlementClient) Update() *BundleSubscriptionEntitlementUpdate {
+	mutation := newBundleSubscriptionEntitlementMutation(c.config, OpUpdate)
+	return &BundleSubscriptionEntitlementUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BundleSubscriptionEntitlementClient) UpdateOne(_m *BundleSubscriptionEntitlement) *BundleSubscriptionEntitlementUpdateOne {
+	mutation := newBundleSubscriptionEntitlementMutation(c.config, OpUpdateOne, withBundleSubscriptionEntitlement(_m))
+	return &BundleSubscriptionEntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BundleSubscriptionEntitlementClient) UpdateOneID(id int64) *BundleSubscriptionEntitlementUpdateOne {
+	mutation := newBundleSubscriptionEntitlementMutation(c.config, OpUpdateOne, withBundleSubscriptionEntitlementID(id))
+	return &BundleSubscriptionEntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BundleSubscriptionEntitlement.
+func (c *BundleSubscriptionEntitlementClient) Delete() *BundleSubscriptionEntitlementDelete {
+	mutation := newBundleSubscriptionEntitlementMutation(c.config, OpDelete)
+	return &BundleSubscriptionEntitlementDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BundleSubscriptionEntitlementClient) DeleteOne(_m *BundleSubscriptionEntitlement) *BundleSubscriptionEntitlementDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BundleSubscriptionEntitlementClient) DeleteOneID(id int64) *BundleSubscriptionEntitlementDeleteOne {
+	builder := c.Delete().Where(bundlesubscriptionentitlement.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BundleSubscriptionEntitlementDeleteOne{builder}
+}
+
+// Query returns a query builder for BundleSubscriptionEntitlement.
+func (c *BundleSubscriptionEntitlementClient) Query() *BundleSubscriptionEntitlementQuery {
+	return &BundleSubscriptionEntitlementQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBundleSubscriptionEntitlement},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BundleSubscriptionEntitlement entity by its id.
+func (c *BundleSubscriptionEntitlementClient) Get(ctx context.Context, id int64) (*BundleSubscriptionEntitlement, error) {
+	return c.Query().Where(bundlesubscriptionentitlement.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BundleSubscriptionEntitlementClient) GetX(ctx context.Context, id int64) *BundleSubscriptionEntitlement {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySubscription queries the subscription edge of a BundleSubscriptionEntitlement.
+func (c *BundleSubscriptionEntitlementClient) QuerySubscription(_m *BundleSubscriptionEntitlement) *BundleSubscriptionQuery {
+	query := (&BundleSubscriptionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundlesubscriptionentitlement.Table, bundlesubscriptionentitlement.FieldID, id),
+			sqlgraph.To(bundlesubscription.Table, bundlesubscription.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, bundlesubscriptionentitlement.SubscriptionTable, bundlesubscriptionentitlement.SubscriptionColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryGroup queries the group edge of a BundleSubscriptionEntitlement.
+func (c *BundleSubscriptionEntitlementClient) QueryGroup(_m *BundleSubscriptionEntitlement) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bundlesubscriptionentitlement.Table, bundlesubscriptionentitlement.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, bundlesubscriptionentitlement.GroupTable, bundlesubscriptionentitlement.GroupColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *BundleSubscriptionEntitlementClient) Hooks() []Hook {
+	return c.hooks.BundleSubscriptionEntitlement
+}
+
+// Interceptors returns the client interceptors.
+func (c *BundleSubscriptionEntitlementClient) Interceptors() []Interceptor {
+	return c.inters.BundleSubscriptionEntitlement
+}
+
+func (c *BundleSubscriptionEntitlementClient) mutate(ctx context.Context, m *BundleSubscriptionEntitlementMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BundleSubscriptionEntitlementCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BundleSubscriptionEntitlementUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BundleSubscriptionEntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BundleSubscriptionEntitlementDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BundleSubscriptionEntitlement mutation op: %q", m.Op())
+	}
+}
+
 // ChannelMonitorClient is a client for the ChannelMonitor schema.
 type ChannelMonitorClient struct {
 	config
@@ -3165,6 +3875,38 @@ func (c *GroupClient) QuerySubscriptions(_m *Group) *UserSubscriptionQuery {
 			sqlgraph.From(group.Table, group.FieldID, id),
 			sqlgraph.To(usersubscription.Table, usersubscription.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, group.SubscriptionsTable, group.SubscriptionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryBundlePlanGroups queries the bundle_plan_groups edge of a Group.
+func (c *GroupClient) QueryBundlePlanGroups(_m *Group) *BundlePlanGroupQuery {
+	query := (&BundlePlanGroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(bundleplangroup.Table, bundleplangroup.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, group.BundlePlanGroupsTable, group.BundlePlanGroupsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryBundleSubscriptionEntitlements queries the bundle_subscription_entitlements edge of a Group.
+func (c *GroupClient) QueryBundleSubscriptionEntitlements(_m *Group) *BundleSubscriptionEntitlementQuery {
+	query := (&BundleSubscriptionEntitlementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(bundlesubscriptionentitlement.Table, bundlesubscriptionentitlement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, group.BundleSubscriptionEntitlementsTable, group.BundleSubscriptionEntitlementsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -5837,6 +6579,22 @@ func (c *UserClient) QuerySubscriptions(_m *User) *UserSubscriptionQuery {
 	return query
 }
 
+// QueryBundleSubscriptions queries the bundle_subscriptions edge of a User.
+func (c *UserClient) QueryBundleSubscriptions(_m *User) *BundleSubscriptionQuery {
+	query := (&BundleSubscriptionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(bundlesubscription.Table, bundlesubscription.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.BundleSubscriptionsTable, user.BundleSubscriptionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryAssignedSubscriptions queries the assigned_subscriptions edge of a User.
 func (c *UserClient) QueryAssignedSubscriptions(_m *User) *UserSubscriptionQuery {
 	query := (&UserSubscriptionClient{config: c.config}).Query()
@@ -6827,26 +7585,28 @@ type (
 	hooks struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
+		BundlePlan, BundlePlanGroup, BundleSubscription, BundleSubscriptionEntitlement,
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute,
-		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
-		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
-		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
-		SubscriptionPlan, TLSFingerprintProfile, UsageCleanupTask, UsageLog, User,
-		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
-		UserPlatformQuota, UserSubscription []ent.Hook
+		ChannelMonitorRequestTemplate, CompositeModelRoute, ErrorPassthroughRule,
+		Group, IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog,
+		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
+		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
+		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
+		UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
+		BundlePlan, BundlePlanGroup, BundleSubscription, BundleSubscriptionEntitlement,
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute,
-		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
-		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
-		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
-		SubscriptionPlan, TLSFingerprintProfile, UsageCleanupTask, UsageLog, User,
-		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
-		UserPlatformQuota, UserSubscription []ent.Interceptor
+		ChannelMonitorRequestTemplate, CompositeModelRoute, ErrorPassthroughRule,
+		Group, IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog,
+		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
+		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
+		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
+		UserSubscription []ent.Interceptor
 	}
 )
 

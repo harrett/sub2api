@@ -81,6 +81,12 @@ func (PaymentOrder) Fields() []ent.Field {
 		field.Int64("plan_id").
 			Optional().
 			Nillable(),
+		field.Int64("bundle_plan_id").
+			Optional().
+			Nillable(),
+		field.Int64("bundle_subscription_id").
+			Optional().
+			Nillable(),
 		field.Int64("subscription_group_id").
 			Optional().
 			Nillable(),

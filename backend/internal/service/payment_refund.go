@@ -255,6 +255,13 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 }
 
 func (s *PaymentService) prepDeduct(ctx context.Context, o *dbent.PaymentOrder, p *RefundPlan, force bool) *RefundResult {
+	if o.OrderType == BundleSubscriptionType {
+		if s.bundleSubscriptionSvc == nil {
+			return &RefundResult{Success: false, Warning: "bundle subscription refund adapter is unavailable"}
+		}
+		p.DeductionType = BundleSubscriptionType
+		return nil
+	}
 	if o.OrderType == payment.OrderTypeSubscription {
 		p.DeductionType = payment.DeductionTypeSubscription
 		if o.SubscriptionGroupID != nil && o.SubscriptionDays != nil {
@@ -322,6 +329,14 @@ func (s *PaymentService) ExecuteRefund(ctx context.Context, p *RefundPlan) (*Ref
 			slog.Warn("skipping subscription deduction on retry (previous rollback failed)", "orderID", p.OrderID)
 			p.SubDaysToDeduct = 0
 		}
+	}
+	if p.DeductionType == BundleSubscriptionType {
+		state, suspendErr := s.bundleSubscriptionSvc.SuspendForOrderRefund(ctx, p.OrderID)
+		if suspendErr != nil {
+			s.restoreStatus(ctx, p)
+			return nil, fmt.Errorf("suspend bundle contract: %w", suspendErr)
+		}
+		p.BundleRefundState = state
 	}
 	resp, err := s.gwRefund(ctx, p)
 	if err != nil {
@@ -472,7 +487,12 @@ func (s *PaymentService) refundFinalizePlan(o *dbent.PaymentOrder) *RefundPlan {
 		Reason:        reason,
 		Force:         o.ForceRefund,
 		DeductBalance: true,
-		DeductionType: payment.DeductionTypeBalance,
+		DeductionType: func() string {
+			if o.OrderType == BundleSubscriptionType {
+				return BundleSubscriptionType
+			}
+			return payment.DeductionTypeBalance
+		}(),
 		BalanceToDeduct: func() float64 {
 			if o.OrderType == payment.OrderTypeBalance {
 				return refundAmount
@@ -502,6 +522,15 @@ func (s *PaymentService) applyRefundFinalDeduction(ctx context.Context, p *Refun
 			} else {
 				return fmt.Errorf("deduct subscription days: %w", err)
 			}
+		}
+	}
+	if p.DeductionType == BundleSubscriptionType && s.bundleSubscriptionSvc != nil {
+		if p.BundleRefundState == nil {
+			state, err := s.bundleSubscriptionSvc.SuspendForOrderRefund(ctx, p.OrderID)
+			if err != nil {
+				return fmt.Errorf("suspend bundle contract: %w", err)
+			}
+			p.BundleRefundState = state
 		}
 	}
 	return nil
@@ -633,6 +662,13 @@ func (s *PaymentService) RollbackRefund(ctx context.Context, p *RefundPlan, gErr
 		if _, err := s.subscriptionSvc.ExtendSubscription(ctx, p.SubscriptionID, p.SubDaysToDeduct); err != nil {
 			slog.Error("[CRITICAL] subscription rollback failed", "orderID", p.OrderID, "subID", p.SubscriptionID, "days", p.SubDaysToDeduct, "error", err)
 			s.writeAuditLog(ctx, p.OrderID, "REFUND_ROLLBACK_FAILED", "admin", map[string]any{"gatewayError": psErrMsg(gErr), "rollbackError": psErrMsg(err), "subDaysDeducted": p.SubDaysToDeduct})
+			return false
+		}
+	}
+	if p.DeductionType == BundleSubscriptionType && p.BundleRefundState != nil && s.bundleSubscriptionSvc != nil {
+		if err := s.bundleSubscriptionSvc.RestoreRefundState(ctx, p.BundleRefundState); err != nil {
+			slog.Error("[CRITICAL] bundle refund rollback failed", "orderID", p.OrderID, "subscriptionID", p.BundleRefundState.SubscriptionID, "error", err)
+			s.writeAuditLog(ctx, p.OrderID, "REFUND_ROLLBACK_FAILED", "admin", map[string]any{"gatewayError": psErrMsg(gErr), "rollbackError": psErrMsg(err)})
 			return false
 		}
 	}

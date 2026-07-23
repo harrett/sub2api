@@ -6662,6 +6662,13 @@
                 </div>
                 <Toggle v-model="form.payment_enabled" />
               </div>
+              <div class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700">
+                <div>
+                  <label class="font-medium text-gray-900 dark:text-white">Cross-platform shared subscriptions</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Enable bundle plans and shared USD quotas. Legacy subscriptions remain unchanged.</p>
+                </div>
+                <Toggle v-model="form.bundle_subscriptions_enabled" />
+              </div>
               <template v-if="form.payment_enabled">
                 <!-- Row 1: Product name -->
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -8433,6 +8440,7 @@ const form = reactive<SettingsForm>({
   backend_mode_enabled: false,
   hide_ccs_import_button: false,
   payment_enabled: false,
+  bundle_subscriptions_enabled: false,
   risk_control_enabled: false,
   cyber_session_block_enabled: false,
   cyber_session_block_ttl_seconds: 3600,
@@ -10098,6 +10106,7 @@ async function saveSettings() {
       ),
       // Payment configuration
       payment_enabled: form.payment_enabled,
+      bundle_subscriptions_enabled: form.bundle_subscriptions_enabled,
       risk_control_enabled: form.risk_control_enabled,
       cyber_session_block_enabled: form.cyber_session_block_enabled,
       cyber_session_block_ttl_seconds:

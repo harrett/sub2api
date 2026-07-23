@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
+	"github.com/Wei-Shaw/sub2api/ent/bundlesubscription"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
@@ -40,6 +41,7 @@ type UserQuery struct {
 	withAPIKeys               *APIKeyQuery
 	withRedeemCodes           *RedeemCodeQuery
 	withSubscriptions         *UserSubscriptionQuery
+	withBundleSubscriptions   *BundleSubscriptionQuery
 	withAssignedSubscriptions *UserSubscriptionQuery
 	withAnnouncementReads     *AnnouncementReadQuery
 	withAllowedGroups         *GroupQuery
@@ -147,6 +149,28 @@ func (_q *UserQuery) QuerySubscriptions() *UserSubscriptionQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(usersubscription.Table, usersubscription.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, user.SubscriptionsTable, user.SubscriptionsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryBundleSubscriptions chains the current query on the "bundle_subscriptions" edge.
+func (_q *UserQuery) QueryBundleSubscriptions() *BundleSubscriptionQuery {
+	query := (&BundleSubscriptionClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(bundlesubscription.Table, bundlesubscription.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.BundleSubscriptionsTable, user.BundleSubscriptionsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -591,6 +615,7 @@ func (_q *UserQuery) Clone() *UserQuery {
 		withAPIKeys:               _q.withAPIKeys.Clone(),
 		withRedeemCodes:           _q.withRedeemCodes.Clone(),
 		withSubscriptions:         _q.withSubscriptions.Clone(),
+		withBundleSubscriptions:   _q.withBundleSubscriptions.Clone(),
 		withAssignedSubscriptions: _q.withAssignedSubscriptions.Clone(),
 		withAnnouncementReads:     _q.withAnnouncementReads.Clone(),
 		withAllowedGroups:         _q.withAllowedGroups.Clone(),
@@ -638,6 +663,17 @@ func (_q *UserQuery) WithSubscriptions(opts ...func(*UserSubscriptionQuery)) *Us
 		opt(query)
 	}
 	_q.withSubscriptions = query
+	return _q
+}
+
+// WithBundleSubscriptions tells the query-builder to eager-load the nodes that are connected to
+// the "bundle_subscriptions" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithBundleSubscriptions(opts ...func(*BundleSubscriptionQuery)) *UserQuery {
+	query := (&BundleSubscriptionClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withBundleSubscriptions = query
 	return _q
 }
 
@@ -840,10 +876,11 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
-		loadedTypes = [14]bool{
+		loadedTypes = [15]bool{
 			_q.withAPIKeys != nil,
 			_q.withRedeemCodes != nil,
 			_q.withSubscriptions != nil,
+			_q.withBundleSubscriptions != nil,
 			_q.withAssignedSubscriptions != nil,
 			_q.withAnnouncementReads != nil,
 			_q.withAllowedGroups != nil,
@@ -896,6 +933,15 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := _q.loadSubscriptions(ctx, query, nodes,
 			func(n *User) { n.Edges.Subscriptions = []*UserSubscription{} },
 			func(n *User, e *UserSubscription) { n.Edges.Subscriptions = append(n.Edges.Subscriptions, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withBundleSubscriptions; query != nil {
+		if err := _q.loadBundleSubscriptions(ctx, query, nodes,
+			func(n *User) { n.Edges.BundleSubscriptions = []*BundleSubscription{} },
+			func(n *User, e *BundleSubscription) {
+				n.Edges.BundleSubscriptions = append(n.Edges.BundleSubscriptions, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -1061,6 +1107,36 @@ func (_q *UserQuery) loadSubscriptions(ctx context.Context, query *UserSubscript
 	}
 	query.Where(predicate.UserSubscription(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(user.SubscriptionsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadBundleSubscriptions(ctx context.Context, query *BundleSubscriptionQuery, nodes []*User, init func(*User), assign func(*User, *BundleSubscription)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(bundlesubscription.FieldUserID)
+	}
+	query.Where(predicate.BundleSubscription(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.BundleSubscriptionsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

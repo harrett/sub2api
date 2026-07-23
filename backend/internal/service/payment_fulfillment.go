@@ -221,7 +221,48 @@ func (s *PaymentService) executeFulfillment(ctx context.Context, oid int64) erro
 	if o.OrderType == payment.OrderTypeSubscription {
 		return s.ExecuteSubscriptionFulfillment(ctx, oid)
 	}
+	if o.OrderType == BundleSubscriptionType {
+		if s.bundleSubscriptionSvc == nil {
+			return ErrBundleSubscriptionsDisabled
+		}
+		return s.ExecuteBundleFulfillment(ctx, oid)
+	}
 	return s.ExecuteBalanceFulfillment(ctx, oid)
+}
+
+// ExecuteBundleFulfillment uses the same short-lived order lease as legacy
+// balance and subscription fulfillment. Bundle fulfillment itself commits the
+// contract and marks the order completed in one transaction after the lease is
+// acquired, so concurrent provider callbacks cannot extend the contract twice.
+func (s *PaymentService) ExecuteBundleFulfillment(ctx context.Context, oid int64) error {
+	o, err := s.entClient.PaymentOrder.Get(ctx, oid)
+	if err != nil {
+		return infraerrors.NotFound("NOT_FOUND", "order not found")
+	}
+	if o.Status == OrderStatusCompleted {
+		return nil
+	}
+	if psIsRefundStatus(o.Status) {
+		return infraerrors.BadRequest("INVALID_STATUS", "refund-related order cannot fulfill")
+	}
+	if o.Status != OrderStatusPaid && o.Status != OrderStatusFailed && o.Status != OrderStatusRecharging {
+		return infraerrors.BadRequest("INVALID_STATUS", "order cannot fulfill in status "+o.Status)
+	}
+	if s.bundleSubscriptionSvc == nil {
+		return ErrBundleSubscriptionsDisabled
+	}
+	lease, err := s.acquirePaymentFulfillmentLease(ctx, o)
+	if err != nil {
+		return err
+	}
+	if lease == nil {
+		return nil
+	}
+	if _, err = s.bundleSubscriptionSvc.FulfillPaidOrder(ctx, oid); err != nil {
+		s.markFailed(ctx, oid, lease, err)
+		return err
+	}
+	return nil
 }
 
 func (s *PaymentService) ExecuteBalanceFulfillment(ctx context.Context, oid int64) error {

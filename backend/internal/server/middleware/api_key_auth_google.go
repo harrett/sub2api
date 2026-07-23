@@ -3,6 +3,7 @@ package middleware
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -22,7 +23,8 @@ func APIKeyAuthGoogle(apiKeyService *service.APIKeyService, cfg *config.Config) 
 // {"error":{"code":401,"message":"...","status":"UNAUTHENTICATED"}}
 //
 // It is intended for Gemini native endpoints (/v1beta) to match Gemini SDK expectations.
-func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) gin.HandlerFunc {
+func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config, bundleResolvers ...service.EntitlementResolver) gin.HandlerFunc {
+	bundleResolver := firstBundleResolver(bundleResolvers)
 	return func(c *gin.Context) {
 		if rejectInvalidAuthAbuse(c, apiKeyService) {
 			abortWithGoogleError(c, 429, "Too many invalid authentication attempts; retry later")
@@ -166,17 +168,16 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		}
 
 		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+		var bundleBilling *service.BundleUsageBilling
+		var subscription *service.UserSubscription
 		if isSubscriptionType && subscriptionService != nil {
-			subscription, err := subscriptionService.GetActiveSubscription(
+			subscription, _ = subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
 				apiKey.Group.ID,
 			)
-			if err != nil {
-				abortWithGoogleError(c, 403, "No active subscription found for this group")
-				return
-			}
-
+		}
+		if subscription != nil {
 			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
 			if needsMaintenance {
 				refreshed, maintenanceErr := subscriptionService.EnsureWindowMaintenance(c.Request.Context(), subscription)
@@ -199,6 +200,24 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			}
 
 			c.Set(string(ContextKeySubscription), subscription)
+		} else if isSubscriptionType && bundleResolver != nil {
+			entitlement, resolveErr := bundleResolver.Resolve(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID, apiKey.Group.Platform)
+			if resolveErr != nil {
+				abortWithGoogleError(c, 403, "No active subscription found for this group")
+				return
+			}
+			bundleBilling = &service.BundleUsageBilling{Entitlement: entitlement, Resolver: bundleResolver}
+			if err := bundleResolver.ReserveUsage(c.Request.Context(), entitlement.UserID, entitlement.GroupID, entitlement.Platform, 0); err != nil {
+				status := http.StatusForbidden
+				if errors.Is(err, service.ErrBundleQuotaExceeded) {
+					status = http.StatusTooManyRequests
+				}
+				abortWithGoogleError(c, status, err.Error())
+				return
+			}
+		} else if isSubscriptionType && subscriptionService != nil {
+			abortWithGoogleError(c, 403, "No active subscription found for this group")
+			return
 		} else {
 			if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 				abortWithGoogleError(c, 403, "Insufficient account balance")
@@ -212,6 +231,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			Concurrency: apiKey.User.Concurrency,
 		})
 		c.Set(string(ContextKeyUserRole), apiKey.User.Role)
+		if bundleBilling != nil {
+			c.Request = c.Request.WithContext(service.WithBundleUsageBilling(c.Request.Context(), bundleBilling.Entitlement, bundleBilling.Resolver))
+		}
 		setGroupContext(c, apiKey.Group)
 		_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 		c.Next()

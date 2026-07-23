@@ -2244,6 +2244,52 @@ func HasSubscriptionsWith(preds ...predicate.UserSubscription) predicate.Group {
 	})
 }
 
+// HasBundlePlanGroups applies the HasEdge predicate on the "bundle_plan_groups" edge.
+func HasBundlePlanGroups() predicate.Group {
+	return predicate.Group(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, BundlePlanGroupsTable, BundlePlanGroupsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasBundlePlanGroupsWith applies the HasEdge predicate on the "bundle_plan_groups" edge with a given conditions (other predicates).
+func HasBundlePlanGroupsWith(preds ...predicate.BundlePlanGroup) predicate.Group {
+	return predicate.Group(func(s *sql.Selector) {
+		step := newBundlePlanGroupsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasBundleSubscriptionEntitlements applies the HasEdge predicate on the "bundle_subscription_entitlements" edge.
+func HasBundleSubscriptionEntitlements() predicate.Group {
+	return predicate.Group(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, BundleSubscriptionEntitlementsTable, BundleSubscriptionEntitlementsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasBundleSubscriptionEntitlementsWith applies the HasEdge predicate on the "bundle_subscription_entitlements" edge with a given conditions (other predicates).
+func HasBundleSubscriptionEntitlementsWith(preds ...predicate.BundleSubscriptionEntitlement) predicate.Group {
+	return predicate.Group(func(s *sql.Selector) {
+		step := newBundleSubscriptionEntitlementsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasUsageLogs applies the HasEdge predicate on the "usage_logs" edge.
 func HasUsageLogs() predicate.Group {
 	return predicate.Group(func(s *sql.Selector) {

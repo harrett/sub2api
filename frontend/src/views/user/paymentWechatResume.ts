@@ -4,7 +4,7 @@ import { normalizeVisibleMethod } from '@/components/payment/paymentFlow'
 
 export interface ParsedWechatResumeRoute {
   orderAmount: number
-  orderType: 'balance' | 'subscription'
+  orderType: 'balance' | 'subscription' | 'bundle_subscription'
   paymentType: string
   planId?: number
   openid?: string
@@ -38,11 +38,17 @@ export function parseWechatResumeRoute(
 
   const wechatResumeToken = readQueryString(query, 'wechat_resume_token')
   const paymentType = normalizeVisibleMethod(readQueryString(query, 'payment_type')) || 'wxpay'
-  const planId = Number.parseInt(readQueryString(query, 'plan_id'), 10)
+  const requestedOrderType = readQueryString(query, 'order_type')
+  const bundlePlanId = Number.parseInt(readQueryString(query, 'bundle_plan_id'), 10)
+  const legacyPlanId = Number.parseInt(readQueryString(query, 'plan_id'), 10)
+  const isBundle = requestedOrderType === 'bundle_subscription' || (Number.isFinite(bundlePlanId) && bundlePlanId > 0)
+  const planId = isBundle ? bundlePlanId : legacyPlanId
   const hasPlanId = Number.isFinite(planId) && planId > 0
-  const orderType = readQueryString(query, 'order_type') === 'subscription' || hasPlanId
-    ? 'subscription'
-    : 'balance'
+  const orderType = isBundle
+    ? 'bundle_subscription'
+    : requestedOrderType === 'subscription' || hasPlanId
+      ? 'subscription'
+      : 'balance'
 
   if (wechatResumeToken) {
     return {
@@ -62,7 +68,7 @@ export function parseWechatResumeRoute(
   const rawAmount = Number.parseFloat(readQueryString(query, 'amount'))
   const orderAmount = Number.isFinite(rawAmount) && rawAmount > 0
     ? rawAmount
-    : (orderType === 'subscription'
+    : (orderType !== 'balance'
       ? (plans.find(plan => plan.id === planId)?.price ?? 0)
       : fallbackBalanceAmount)
 
@@ -86,5 +92,6 @@ export function stripWechatResumeQuery(query: LocationQuery): LocationQueryRaw {
   delete nextQuery.amount
   delete nextQuery.order_type
   delete nextQuery.plan_id
+  delete nextQuery.bundle_plan_id
   return nextQuery
 }

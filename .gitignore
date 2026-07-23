@@ -2,6 +2,11 @@ docs/claude-relay-service/
 .codex
 
 # ===================
+# marketing-website
+# ===================
+/marketing/
+
+# ===================
 # Go 后端
 # ===================
 # 二进制文件

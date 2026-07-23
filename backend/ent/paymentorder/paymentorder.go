@@ -46,6 +46,10 @@ const (
 	FieldOrderType = "order_type"
 	// FieldPlanID holds the string denoting the plan_id field in the database.
 	FieldPlanID = "plan_id"
+	// FieldBundlePlanID holds the string denoting the bundle_plan_id field in the database.
+	FieldBundlePlanID = "bundle_plan_id"
+	// FieldBundleSubscriptionID holds the string denoting the bundle_subscription_id field in the database.
+	FieldBundleSubscriptionID = "bundle_subscription_id"
 	// FieldSubscriptionGroupID holds the string denoting the subscription_group_id field in the database.
 	FieldSubscriptionGroupID = "subscription_group_id"
 	// FieldSubscriptionDays holds the string denoting the subscription_days field in the database.
@@ -124,6 +128,8 @@ var Columns = []string{
 	FieldQrCodeImg,
 	FieldOrderType,
 	FieldPlanID,
+	FieldBundlePlanID,
+	FieldBundleSubscriptionID,
 	FieldSubscriptionGroupID,
 	FieldSubscriptionDays,
 	FieldProviderInstanceID,
@@ -292,6 +298,16 @@ func ByOrderType(opts ...sql.OrderTermOption) OrderOption {
 // ByPlanID orders the results by the plan_id field.
 func ByPlanID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPlanID, opts...).ToFunc()
+}
+
+// ByBundlePlanID orders the results by the bundle_plan_id field.
+func ByBundlePlanID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBundlePlanID, opts...).ToFunc()
+}
+
+// ByBundleSubscriptionID orders the results by the bundle_subscription_id field.
+func ByBundleSubscriptionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBundleSubscriptionID, opts...).ToFunc()
 }
 
 // BySubscriptionGroupID orders the results by the subscription_group_id field.

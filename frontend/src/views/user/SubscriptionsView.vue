@@ -8,8 +8,31 @@
         ></div>
       </div>
 
+      <section v-if="bundleEnabled && bundleSubscriptions.length > 0" class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Cross-platform contracts</h2>
+          <button class="btn btn-primary text-sm" @click="router.push('/purchase')">Buy or extend</button>
+        </div>
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div v-for="subscription in bundleSubscriptions" :key="subscription.id" class="rounded-xl border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-800">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="font-semibold text-gray-900 dark:text-white">{{ subscription.plan?.name || `Bundle #${subscription.bundle_plan_id}` }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ subscription.starts_at }} - {{ subscription.expires_at }}</p>
+              </div>
+              <span class="badge" :class="subscription.status === 'active' ? 'badge-success' : 'badge-warning'">{{ subscription.status }}</span>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div class="rounded-lg bg-gray-50 p-3 dark:bg-dark-900"><span class="block text-xs text-gray-500">Daily</span><strong>${{ subscription.daily_usage_usd.toFixed(2) }}</strong><span v-if="subscription.plan?.shared_daily_limit_usd != null" class="text-gray-500"> / ${{ subscription.plan.shared_daily_limit_usd.toFixed(2) }}</span></div>
+              <div class="rounded-lg bg-gray-50 p-3 dark:bg-dark-900"><span class="block text-xs text-gray-500">Monthly</span><strong>${{ subscription.monthly_usage_usd.toFixed(2) }}</strong><span v-if="subscription.plan?.shared_monthly_limit_usd != null" class="text-gray-500"> / ${{ subscription.plan.shared_monthly_limit_usd.toFixed(2) }}</span></div>
+            </div>
+            <button v-if="subscription.status === 'pending'" class="btn btn-secondary mt-3 w-full text-sm" @click="cancelBundle(subscription.id)">Cancel pending change</button>
+          </div>
+        </div>
+      </section>
+
       <!-- Empty State -->
-      <div v-else-if="subscriptions.length === 0" class="card p-12 text-center">
+      <div v-else-if="subscriptions.length === 0 && (!bundleEnabled || bundleSubscriptions.length === 0)" class="card p-12 text-center">
         <div
           class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-dark-700"
         >
@@ -24,7 +47,7 @@
       </div>
 
       <!-- Subscriptions Grid -->
-      <div v-else class="grid gap-6 lg:grid-cols-2">
+      <div v-else-if="subscriptions.length > 0" class="grid gap-6 lg:grid-cols-2">
         <div
           v-for="subscription in subscriptions"
           :key="subscription.id"
@@ -248,12 +271,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import subscriptionsAPI from '@/api/subscriptions'
 import type { UserSubscription } from '@/types'
+import bundleSubscriptionsAPI, { type BundleSubscription } from '@/api/bundleSubscriptions'
+import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTimeToMinute } from '@/utils/format'
@@ -276,7 +301,9 @@ const router = useRouter()
 const appStore = useAppStore()
 
 const subscriptions = ref<UserSubscription[]>([])
+const bundleSubscriptions = ref<BundleSubscription[]>([])
 const loading = ref(true)
+const bundleEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.bundleSubscriptions))
 
 function subscriptionHasPeakRate(subscription: UserSubscription): boolean {
   return hasPeakRate(subscription.group)
@@ -290,11 +317,26 @@ async function loadSubscriptions() {
   try {
     loading.value = true
     subscriptions.value = await subscriptionsAPI.getMySubscriptions()
+    if (bundleEnabled.value) {
+      const response = await bundleSubscriptionsAPI.getMine()
+      bundleSubscriptions.value = response.data
+    }
   } catch (error) {
     console.error('Failed to load subscriptions:', error)
     appStore.showError(t('userSubscriptions.failedToLoad'))
   } finally {
     loading.value = false
+  }
+}
+
+async function cancelBundle(id: number) {
+  try {
+    await bundleSubscriptionsAPI.cancelPending(id)
+    const current = bundleSubscriptions.value.find((subscription) => subscription.id === id)
+    if (current) current.status = 'revoked'
+  } catch (error) {
+    console.error('Failed to cancel bundle subscription:', error)
+    appStore.showError(t('common.error'))
   }
 }
 

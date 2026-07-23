@@ -34,6 +34,14 @@ type Tx struct {
 	BatchImageItem *BatchImageItemClient
 	// BatchImageJob is the client for interacting with the BatchImageJob builders.
 	BatchImageJob *BatchImageJobClient
+	// BundlePlan is the client for interacting with the BundlePlan builders.
+	BundlePlan *BundlePlanClient
+	// BundlePlanGroup is the client for interacting with the BundlePlanGroup builders.
+	BundlePlanGroup *BundlePlanGroupClient
+	// BundleSubscription is the client for interacting with the BundleSubscription builders.
+	BundleSubscription *BundleSubscriptionClient
+	// BundleSubscriptionEntitlement is the client for interacting with the BundleSubscriptionEntitlement builders.
+	BundleSubscriptionEntitlement *BundleSubscriptionEntitlementClient
 	// ChannelMonitor is the client for interacting with the ChannelMonitor builders.
 	ChannelMonitor *ChannelMonitorClient
 	// ChannelMonitorDailyRollup is the client for interacting with the ChannelMonitorDailyRollup builders.
@@ -233,6 +241,10 @@ func (tx *Tx) init() {
 	tx.BatchImageEvent = NewBatchImageEventClient(tx.config)
 	tx.BatchImageItem = NewBatchImageItemClient(tx.config)
 	tx.BatchImageJob = NewBatchImageJobClient(tx.config)
+	tx.BundlePlan = NewBundlePlanClient(tx.config)
+	tx.BundlePlanGroup = NewBundlePlanGroupClient(tx.config)
+	tx.BundleSubscription = NewBundleSubscriptionClient(tx.config)
+	tx.BundleSubscriptionEntitlement = NewBundleSubscriptionEntitlementClient(tx.config)
 	tx.ChannelMonitor = NewChannelMonitorClient(tx.config)
 	tx.ChannelMonitorDailyRollup = NewChannelMonitorDailyRollupClient(tx.config)
 	tx.ChannelMonitorHistory = NewChannelMonitorHistoryClient(tx.config)

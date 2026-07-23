@@ -55,6 +55,15 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	}
 	orderAmount := req.Amount
 	limitAmount := req.Amount
+	if req.OrderType == BundleSubscriptionType {
+		bundlePlan, bundleErr := s.entClient.BundlePlan.Get(ctx, req.BundlePlanID)
+		if bundleErr != nil || !bundlePlan.ForSale {
+			return nil, ErrBundlePlanNotFound
+		}
+		req.Amount = bundlePlan.Price
+		orderAmount = bundlePlan.Price
+		limitAmount = bundlePlan.Price
+	}
 	if plan != nil {
 		orderAmount = plan.Price
 		limitAmount = plan.Price
@@ -120,6 +129,22 @@ func (s *PaymentService) validateOrderInput(ctx context.Context, req CreateOrder
 	}
 	if req.OrderType == payment.OrderTypeSubscription {
 		return s.validateSubOrder(ctx, req)
+	}
+	if req.OrderType == BundleSubscriptionType {
+		if s.bundleSubscriptionSvc == nil {
+			return nil, ErrBundleSubscriptionsDisabled
+		}
+		if err := s.bundleSubscriptionSvc.EnsureEnabled(ctx); err != nil {
+			return nil, err
+		}
+		if req.BundlePlanID <= 0 {
+			return nil, ErrBundlePlanNotFound
+		}
+		p, err := s.entClient.BundlePlan.Get(ctx, req.BundlePlanID)
+		if err != nil || !p.ForSale {
+			return nil, ErrBundlePlanNotFound
+		}
+		return nil, nil
 	}
 	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount <= 0 {
 		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "amount must be a positive number")
@@ -208,6 +233,9 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 	}
 	if plan != nil {
 		b.SetPlanID(plan.ID).SetSubscriptionGroupID(plan.GroupID).SetSubscriptionDays(psComputeValidityDays(plan.ValidityDays, plan.ValidityUnit))
+	}
+	if req.OrderType == BundleSubscriptionType && req.BundlePlanID > 0 {
+		b.SetBundlePlanID(req.BundlePlanID)
 	}
 	order, err := b.Save(ctx)
 	if err != nil {
@@ -645,7 +673,7 @@ func calculateCreateOrderPayAmount(limitAmount, feeRate float64, currency string
 
 func calculateCreateOrderPayAmountForOrderType(limitAmount, feeRate float64, currency, orderType string, usdToCnyRate float64) (string, float64, error) {
 	paymentAmount := limitAmount
-	if orderType == payment.OrderTypeSubscription {
+	if orderType == payment.OrderTypeSubscription || orderType == BundleSubscriptionType {
 		paymentAmount = calculateSubscriptionGatewayBaseAmount(limitAmount, usdToCnyRate, currency)
 	}
 	return calculateCreateOrderPayAmount(paymentAmount, feeRate, currency)

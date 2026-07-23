@@ -127,6 +127,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	user := input.User
 	account := input.Account
 	subscription := input.Subscription
+	bundleBilling, isBundleBilling := BundleUsageBillingFromContext(ctx)
 	if !isGrokVideoUsageResult(result, nil) {
 		ApplyOpenAIImageBillingResolution(result)
 	}
@@ -224,7 +225,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	// Determine billing type
-	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+	isSubscriptionBilling := (subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()) || isBundleBilling
 	billingType := BillingTypeBalance
 	if isSubscriptionBilling {
 		billingType = BillingTypeSubscription
@@ -363,18 +364,33 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	billingErr := func() error {
-		_, err := applyUsageBilling(ctx, requestID, usageLog, &postUsageBillingParams{
+		if isBundleBilling && cost.ActualCost > 0 {
+			if err := bundleBilling.Resolver.ReserveUsage(ctx, bundleBilling.Entitlement.UserID, bundleBilling.Entitlement.GroupID, bundleBilling.Entitlement.Platform, cost.ActualCost); err != nil {
+				return err
+			}
+		}
+		applied, err := applyUsageBilling(ctx, requestID, usageLog, &postUsageBillingParams{
 			Cost:                  cost,
 			User:                  user,
 			APIKey:                apiKey,
 			Account:               account,
 			Subscription:          subscription,
+			BundleSubscription:    isBundleBilling,
 			RequestPayloadHash:    resolveUsageBillingPayloadFingerprint(ctx, input.RequestPayloadHash),
 			IsSubscriptionBill:    isSubscriptionBilling,
 			AccountRateMultiplier: accountRateMultiplier,
 			APIKeyService:         input.APIKeyService,
 			Platform:              quotaPlatform,
 		}, s.billingDeps(), s.usageBillingRepo)
+		if isBundleBilling && (!applied || err != nil) && cost.ActualCost > 0 {
+			if releaser, ok := bundleBilling.Resolver.(interface {
+				ReleaseUsage(context.Context, int64, int64, string, float64) error
+			}); ok {
+				if releaseErr := releaser.ReleaseUsage(ctx, bundleBilling.Entitlement.UserID, bundleBilling.Entitlement.GroupID, bundleBilling.Entitlement.Platform, cost.ActualCost); releaseErr != nil {
+					logger.LegacyPrintf("service.openai_gateway", "bundle usage reservation release failed: %v", releaseErr)
+				}
+			}
+		}
 		return err
 	}()
 

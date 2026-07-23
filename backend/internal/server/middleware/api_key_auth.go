@@ -18,8 +18,8 @@ import (
 const maxAPIKeyAuthorizationHeaderBytes = service.MaxAPIKeyCredentialBytes + 128
 
 // NewAPIKeyAuthMiddleware 创建 API Key 认证中间件
-func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) APIKeyAuthMiddleware {
-	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, subscriptionService, cfg))
+func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config, bundleResolvers ...service.EntitlementResolver) APIKeyAuthMiddleware {
+	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, subscriptionService, cfg, firstBundleResolver(bundleResolvers)))
 }
 
 // apiKeyAuthWithSubscription API Key认证中间件（支持订阅验证）
@@ -31,7 +31,7 @@ func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionS
 // /v1/usage、/v1/sub2api/billing 端点与异步生图任务查询只需鉴权，不需要计费执行。
 // usage 允许过期/配额耗尽的 Key 查询自身用量，billing 用于读取当前 Key 的倍率配置，
 // 异步生图查询允许已耗尽额度的 Key 拉取自身任务结果。
-func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) gin.HandlerFunc {
+func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config, bundleResolver service.EntitlementResolver) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// ── 1. 提取 API Key ──────────────────────────────────────────
 		if rejectInvalidAuthAbuse(c, apiKeyService) {
@@ -191,6 +191,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// ── 5. 按端点需要加载订阅 ───────────────────────────────────
 
 		var subscription *service.UserSubscription
+		var bundleBilling *service.BundleUsageBilling
 		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 
 		// 倍率自省不需要订阅数据；/v1/usage 仍保留原有订阅读取行为。
@@ -200,14 +201,15 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				apiKey.User.ID,
 				apiKey.Group.ID,
 			)
-			if subErr != nil {
-				if !skipBilling {
-					AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
-					return
-				}
-				// skipBilling: 订阅不存在也放行，handler 会返回可用的数据
-			} else {
+			if subErr == nil {
 				subscription = sub
+			}
+		}
+		// Bundle contracts are a fallback for subscription groups only. Legacy
+		// subscriptions keep their existing precedence and behavior.
+		if isSubscriptionType && subscription == nil && bundleResolver != nil && !billingInfoRequest {
+			if entitlement, bundleErr := bundleResolver.Resolve(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID, apiKey.Group.Platform); bundleErr == nil {
+				bundleBilling = &service.BundleUsageBilling{Entitlement: entitlement, Resolver: bundleResolver}
 			}
 		}
 
@@ -258,8 +260,22 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 					AbortWithError(c, status, code, validateErr.Error())
 					return
 				}
+			} else if bundleBilling != nil {
+				if err := bundleBilling.Resolver.ReserveUsage(c.Request.Context(), bundleBilling.Entitlement.UserID, bundleBilling.Entitlement.GroupID, bundleBilling.Entitlement.Platform, 0); err != nil {
+					status := http.StatusForbidden
+					code := "SUBSCRIPTION_INVALID"
+					if errors.Is(err, service.ErrBundleQuotaExceeded) {
+						status = http.StatusTooManyRequests
+						code = "USAGE_LIMIT_EXCEEDED"
+					}
+					AbortWithError(c, status, code, err.Error())
+					return
+				}
+			} else if isSubscriptionType && subscriptionService != nil {
+				AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
+				return
 			} else {
-				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
+				// 非订阅模式或没有订阅服务时，保留旧的余额检查。
 				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 					return
@@ -271,6 +287,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		if subscription != nil {
 			c.Set(string(ContextKeySubscription), subscription)
+		}
+		if bundleBilling != nil {
+			c.Request = c.Request.WithContext(service.WithBundleUsageBilling(c.Request.Context(), bundleBilling.Entitlement, bundleBilling.Resolver))
 		}
 		c.Set(string(ContextKeyAPIKey), apiKey)
 		c.Set(string(ContextKeyUser), AuthSubject{
@@ -285,6 +304,13 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		c.Next()
 	}
+}
+
+func firstBundleResolver(resolvers []service.EntitlementResolver) service.EntitlementResolver {
+	if len(resolvers) == 0 {
+		return nil
+	}
+	return resolvers[0]
 }
 
 func apiKeyHeadersTooLarge(c *gin.Context) bool {

@@ -105,6 +105,9 @@ func usageRecordContext(parent context.Context, base context.Context) context.Co
 	if requestID, _ := parent.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
 		base = context.WithValue(base, ctxkey.RequestID, strings.TrimSpace(requestID))
 	}
+	if bundleBilling, ok := service.BundleUsageBillingFromContext(parent); ok {
+		base = service.WithBundleUsageBilling(base, bundleBilling.Entitlement, bundleBilling.Resolver)
+	}
 	return base
 }
 

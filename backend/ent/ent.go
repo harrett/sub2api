@@ -22,6 +22,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/batchimageevent"
 	"github.com/Wei-Shaw/sub2api/ent/batchimageitem"
 	"github.com/Wei-Shaw/sub2api/ent/batchimagejob"
+	"github.com/Wei-Shaw/sub2api/ent/bundleplan"
+	"github.com/Wei-Shaw/sub2api/ent/bundleplangroup"
+	"github.com/Wei-Shaw/sub2api/ent/bundlesubscription"
+	"github.com/Wei-Shaw/sub2api/ent/bundlesubscriptionentitlement"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -121,6 +125,10 @@ func checkColumn(t, c string) error {
 			batchimageevent.Table:               batchimageevent.ValidColumn,
 			batchimageitem.Table:                batchimageitem.ValidColumn,
 			batchimagejob.Table:                 batchimagejob.ValidColumn,
+			bundleplan.Table:                    bundleplan.ValidColumn,
+			bundleplangroup.Table:               bundleplangroup.ValidColumn,
+			bundlesubscription.Table:            bundlesubscription.ValidColumn,
+			bundlesubscriptionentitlement.Table: bundlesubscriptionentitlement.ValidColumn,
 			channelmonitor.Table:                channelmonitor.ValidColumn,
 			channelmonitordailyrollup.Table:     channelmonitordailyrollup.ValidColumn,
 			channelmonitorhistory.Table:         channelmonitorhistory.ValidColumn,

@@ -16,6 +16,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/bundleplangroup"
+	"github.com/Wei-Shaw/sub2api/ent/bundlesubscriptionentitlement"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
@@ -28,19 +30,21 @@ import (
 // GroupQuery is the builder for querying Group entities.
 type GroupQuery struct {
 	config
-	ctx                   *QueryContext
-	order                 []group.OrderOption
-	inters                []Interceptor
-	predicates            []predicate.Group
-	withAPIKeys           *APIKeyQuery
-	withRedeemCodes       *RedeemCodeQuery
-	withSubscriptions     *UserSubscriptionQuery
-	withUsageLogs         *UsageLogQuery
-	withAccounts          *AccountQuery
-	withAllowedUsers      *UserQuery
-	withAccountGroups     *AccountGroupQuery
-	withUserAllowedGroups *UserAllowedGroupQuery
-	modifiers             []func(*sql.Selector)
+	ctx                                *QueryContext
+	order                              []group.OrderOption
+	inters                             []Interceptor
+	predicates                         []predicate.Group
+	withAPIKeys                        *APIKeyQuery
+	withRedeemCodes                    *RedeemCodeQuery
+	withSubscriptions                  *UserSubscriptionQuery
+	withBundlePlanGroups               *BundlePlanGroupQuery
+	withBundleSubscriptionEntitlements *BundleSubscriptionEntitlementQuery
+	withUsageLogs                      *UsageLogQuery
+	withAccounts                       *AccountQuery
+	withAllowedUsers                   *UserQuery
+	withAccountGroups                  *AccountGroupQuery
+	withUserAllowedGroups              *UserAllowedGroupQuery
+	modifiers                          []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -136,6 +140,50 @@ func (_q *GroupQuery) QuerySubscriptions() *UserSubscriptionQuery {
 			sqlgraph.From(group.Table, group.FieldID, selector),
 			sqlgraph.To(usersubscription.Table, usersubscription.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, group.SubscriptionsTable, group.SubscriptionsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryBundlePlanGroups chains the current query on the "bundle_plan_groups" edge.
+func (_q *GroupQuery) QueryBundlePlanGroups() *BundlePlanGroupQuery {
+	query := (&BundlePlanGroupClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, selector),
+			sqlgraph.To(bundleplangroup.Table, bundleplangroup.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, group.BundlePlanGroupsTable, group.BundlePlanGroupsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryBundleSubscriptionEntitlements chains the current query on the "bundle_subscription_entitlements" edge.
+func (_q *GroupQuery) QueryBundleSubscriptionEntitlements() *BundleSubscriptionEntitlementQuery {
+	query := (&BundleSubscriptionEntitlementClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, selector),
+			sqlgraph.To(bundlesubscriptionentitlement.Table, bundlesubscriptionentitlement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, group.BundleSubscriptionEntitlementsTable, group.BundleSubscriptionEntitlementsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -440,19 +488,21 @@ func (_q *GroupQuery) Clone() *GroupQuery {
 		return nil
 	}
 	return &GroupQuery{
-		config:                _q.config,
-		ctx:                   _q.ctx.Clone(),
-		order:                 append([]group.OrderOption{}, _q.order...),
-		inters:                append([]Interceptor{}, _q.inters...),
-		predicates:            append([]predicate.Group{}, _q.predicates...),
-		withAPIKeys:           _q.withAPIKeys.Clone(),
-		withRedeemCodes:       _q.withRedeemCodes.Clone(),
-		withSubscriptions:     _q.withSubscriptions.Clone(),
-		withUsageLogs:         _q.withUsageLogs.Clone(),
-		withAccounts:          _q.withAccounts.Clone(),
-		withAllowedUsers:      _q.withAllowedUsers.Clone(),
-		withAccountGroups:     _q.withAccountGroups.Clone(),
-		withUserAllowedGroups: _q.withUserAllowedGroups.Clone(),
+		config:                             _q.config,
+		ctx:                                _q.ctx.Clone(),
+		order:                              append([]group.OrderOption{}, _q.order...),
+		inters:                             append([]Interceptor{}, _q.inters...),
+		predicates:                         append([]predicate.Group{}, _q.predicates...),
+		withAPIKeys:                        _q.withAPIKeys.Clone(),
+		withRedeemCodes:                    _q.withRedeemCodes.Clone(),
+		withSubscriptions:                  _q.withSubscriptions.Clone(),
+		withBundlePlanGroups:               _q.withBundlePlanGroups.Clone(),
+		withBundleSubscriptionEntitlements: _q.withBundleSubscriptionEntitlements.Clone(),
+		withUsageLogs:                      _q.withUsageLogs.Clone(),
+		withAccounts:                       _q.withAccounts.Clone(),
+		withAllowedUsers:                   _q.withAllowedUsers.Clone(),
+		withAccountGroups:                  _q.withAccountGroups.Clone(),
+		withUserAllowedGroups:              _q.withUserAllowedGroups.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -489,6 +539,28 @@ func (_q *GroupQuery) WithSubscriptions(opts ...func(*UserSubscriptionQuery)) *G
 		opt(query)
 	}
 	_q.withSubscriptions = query
+	return _q
+}
+
+// WithBundlePlanGroups tells the query-builder to eager-load the nodes that are connected to
+// the "bundle_plan_groups" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *GroupQuery) WithBundlePlanGroups(opts ...func(*BundlePlanGroupQuery)) *GroupQuery {
+	query := (&BundlePlanGroupClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withBundlePlanGroups = query
+	return _q
+}
+
+// WithBundleSubscriptionEntitlements tells the query-builder to eager-load the nodes that are connected to
+// the "bundle_subscription_entitlements" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *GroupQuery) WithBundleSubscriptionEntitlements(opts ...func(*BundleSubscriptionEntitlementQuery)) *GroupQuery {
+	query := (&BundleSubscriptionEntitlementClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withBundleSubscriptionEntitlements = query
 	return _q
 }
 
@@ -625,10 +697,12 @@ func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	var (
 		nodes       = []*Group{}
 		_spec       = _q.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [10]bool{
 			_q.withAPIKeys != nil,
 			_q.withRedeemCodes != nil,
 			_q.withSubscriptions != nil,
+			_q.withBundlePlanGroups != nil,
+			_q.withBundleSubscriptionEntitlements != nil,
 			_q.withUsageLogs != nil,
 			_q.withAccounts != nil,
 			_q.withAllowedUsers != nil,
@@ -675,6 +749,22 @@ func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 		if err := _q.loadSubscriptions(ctx, query, nodes,
 			func(n *Group) { n.Edges.Subscriptions = []*UserSubscription{} },
 			func(n *Group, e *UserSubscription) { n.Edges.Subscriptions = append(n.Edges.Subscriptions, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withBundlePlanGroups; query != nil {
+		if err := _q.loadBundlePlanGroups(ctx, query, nodes,
+			func(n *Group) { n.Edges.BundlePlanGroups = []*BundlePlanGroup{} },
+			func(n *Group, e *BundlePlanGroup) { n.Edges.BundlePlanGroups = append(n.Edges.BundlePlanGroups, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withBundleSubscriptionEntitlements; query != nil {
+		if err := _q.loadBundleSubscriptionEntitlements(ctx, query, nodes,
+			func(n *Group) { n.Edges.BundleSubscriptionEntitlements = []*BundleSubscriptionEntitlement{} },
+			func(n *Group, e *BundleSubscriptionEntitlement) {
+				n.Edges.BundleSubscriptionEntitlements = append(n.Edges.BundleSubscriptionEntitlements, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -797,6 +887,66 @@ func (_q *GroupQuery) loadSubscriptions(ctx context.Context, query *UserSubscrip
 	}
 	query.Where(predicate.UserSubscription(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(group.SubscriptionsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.GroupID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "group_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *GroupQuery) loadBundlePlanGroups(ctx context.Context, query *BundlePlanGroupQuery, nodes []*Group, init func(*Group), assign func(*Group, *BundlePlanGroup)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Group)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(bundleplangroup.FieldGroupID)
+	}
+	query.Where(predicate.BundlePlanGroup(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(group.BundlePlanGroupsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.GroupID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "group_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *GroupQuery) loadBundleSubscriptionEntitlements(ctx context.Context, query *BundleSubscriptionEntitlementQuery, nodes []*Group, init func(*Group), assign func(*Group, *BundleSubscriptionEntitlement)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Group)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(bundlesubscriptionentitlement.FieldGroupID)
+	}
+	query.Where(predicate.BundleSubscriptionEntitlement(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(group.BundleSubscriptionEntitlementsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

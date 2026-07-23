@@ -124,6 +124,10 @@ const (
 	EdgeRedeemCodes = "redeem_codes"
 	// EdgeSubscriptions holds the string denoting the subscriptions edge name in mutations.
 	EdgeSubscriptions = "subscriptions"
+	// EdgeBundlePlanGroups holds the string denoting the bundle_plan_groups edge name in mutations.
+	EdgeBundlePlanGroups = "bundle_plan_groups"
+	// EdgeBundleSubscriptionEntitlements holds the string denoting the bundle_subscription_entitlements edge name in mutations.
+	EdgeBundleSubscriptionEntitlements = "bundle_subscription_entitlements"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
 	// EdgeAccounts holds the string denoting the accounts edge name in mutations.
@@ -157,6 +161,20 @@ const (
 	SubscriptionsInverseTable = "user_subscriptions"
 	// SubscriptionsColumn is the table column denoting the subscriptions relation/edge.
 	SubscriptionsColumn = "group_id"
+	// BundlePlanGroupsTable is the table that holds the bundle_plan_groups relation/edge.
+	BundlePlanGroupsTable = "bundle_plan_groups"
+	// BundlePlanGroupsInverseTable is the table name for the BundlePlanGroup entity.
+	// It exists in this package in order to avoid circular dependency with the "bundleplangroup" package.
+	BundlePlanGroupsInverseTable = "bundle_plan_groups"
+	// BundlePlanGroupsColumn is the table column denoting the bundle_plan_groups relation/edge.
+	BundlePlanGroupsColumn = "group_id"
+	// BundleSubscriptionEntitlementsTable is the table that holds the bundle_subscription_entitlements relation/edge.
+	BundleSubscriptionEntitlementsTable = "bundle_subscription_entitlements"
+	// BundleSubscriptionEntitlementsInverseTable is the table name for the BundleSubscriptionEntitlement entity.
+	// It exists in this package in order to avoid circular dependency with the "bundlesubscriptionentitlement" package.
+	BundleSubscriptionEntitlementsInverseTable = "bundle_subscription_entitlements"
+	// BundleSubscriptionEntitlementsColumn is the table column denoting the bundle_subscription_entitlements relation/edge.
+	BundleSubscriptionEntitlementsColumn = "group_id"
 	// UsageLogsTable is the table that holds the usage_logs relation/edge.
 	UsageLogsTable = "usage_logs"
 	// UsageLogsInverseTable is the table name for the UsageLog entity.
@@ -643,6 +661,34 @@ func BySubscriptions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByBundlePlanGroupsCount orders the results by bundle_plan_groups count.
+func ByBundlePlanGroupsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newBundlePlanGroupsStep(), opts...)
+	}
+}
+
+// ByBundlePlanGroups orders the results by bundle_plan_groups terms.
+func ByBundlePlanGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newBundlePlanGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByBundleSubscriptionEntitlementsCount orders the results by bundle_subscription_entitlements count.
+func ByBundleSubscriptionEntitlementsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newBundleSubscriptionEntitlementsStep(), opts...)
+	}
+}
+
+// ByBundleSubscriptionEntitlements orders the results by bundle_subscription_entitlements terms.
+func ByBundleSubscriptionEntitlements(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newBundleSubscriptionEntitlementsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByUsageLogsCount orders the results by usage_logs count.
 func ByUsageLogsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -731,6 +777,20 @@ func newSubscriptionsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SubscriptionsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, SubscriptionsTable, SubscriptionsColumn),
+	)
+}
+func newBundlePlanGroupsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(BundlePlanGroupsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, BundlePlanGroupsTable, BundlePlanGroupsColumn),
+	)
+}
+func newBundleSubscriptionEntitlementsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(BundleSubscriptionEntitlementsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, BundleSubscriptionEntitlementsTable, BundleSubscriptionEntitlementsColumn),
 	)
 }
 func newUsageLogsStep() *sqlgraph.Step {

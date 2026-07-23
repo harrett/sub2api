@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
+	"github.com/Wei-Shaw/sub2api/ent/bundlesubscription"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
@@ -477,6 +478,21 @@ func (_u *UserUpdate) AddSubscriptions(v ...*UserSubscription) *UserUpdate {
 	return _u.AddSubscriptionIDs(ids...)
 }
 
+// AddBundleSubscriptionIDs adds the "bundle_subscriptions" edge to the BundleSubscription entity by IDs.
+func (_u *UserUpdate) AddBundleSubscriptionIDs(ids ...int64) *UserUpdate {
+	_u.mutation.AddBundleSubscriptionIDs(ids...)
+	return _u
+}
+
+// AddBundleSubscriptions adds the "bundle_subscriptions" edges to the BundleSubscription entity.
+func (_u *UserUpdate) AddBundleSubscriptions(v ...*BundleSubscription) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddBundleSubscriptionIDs(ids...)
+}
+
 // AddAssignedSubscriptionIDs adds the "assigned_subscriptions" edge to the UserSubscription entity by IDs.
 func (_u *UserUpdate) AddAssignedSubscriptionIDs(ids ...int64) *UserUpdate {
 	_u.mutation.AddAssignedSubscriptionIDs(ids...)
@@ -693,6 +709,27 @@ func (_u *UserUpdate) RemoveSubscriptions(v ...*UserSubscription) *UserUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveSubscriptionIDs(ids...)
+}
+
+// ClearBundleSubscriptions clears all "bundle_subscriptions" edges to the BundleSubscription entity.
+func (_u *UserUpdate) ClearBundleSubscriptions() *UserUpdate {
+	_u.mutation.ClearBundleSubscriptions()
+	return _u
+}
+
+// RemoveBundleSubscriptionIDs removes the "bundle_subscriptions" edge to BundleSubscription entities by IDs.
+func (_u *UserUpdate) RemoveBundleSubscriptionIDs(ids ...int64) *UserUpdate {
+	_u.mutation.RemoveBundleSubscriptionIDs(ids...)
+	return _u
+}
+
+// RemoveBundleSubscriptions removes "bundle_subscriptions" edges to BundleSubscription entities.
+func (_u *UserUpdate) RemoveBundleSubscriptions(v ...*BundleSubscription) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveBundleSubscriptionIDs(ids...)
 }
 
 // ClearAssignedSubscriptions clears all "assigned_subscriptions" edges to the UserSubscription entity.
@@ -1227,6 +1264,51 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.BundleSubscriptionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BundleSubscriptionsTable,
+			Columns: []string{user.BundleSubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(bundlesubscription.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedBundleSubscriptionsIDs(); len(nodes) > 0 && !_u.mutation.BundleSubscriptionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BundleSubscriptionsTable,
+			Columns: []string{user.BundleSubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(bundlesubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.BundleSubscriptionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BundleSubscriptionsTable,
+			Columns: []string{user.BundleSubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(bundlesubscription.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -2153,6 +2235,21 @@ func (_u *UserUpdateOne) AddSubscriptions(v ...*UserSubscription) *UserUpdateOne
 	return _u.AddSubscriptionIDs(ids...)
 }
 
+// AddBundleSubscriptionIDs adds the "bundle_subscriptions" edge to the BundleSubscription entity by IDs.
+func (_u *UserUpdateOne) AddBundleSubscriptionIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.AddBundleSubscriptionIDs(ids...)
+	return _u
+}
+
+// AddBundleSubscriptions adds the "bundle_subscriptions" edges to the BundleSubscription entity.
+func (_u *UserUpdateOne) AddBundleSubscriptions(v ...*BundleSubscription) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddBundleSubscriptionIDs(ids...)
+}
+
 // AddAssignedSubscriptionIDs adds the "assigned_subscriptions" edge to the UserSubscription entity by IDs.
 func (_u *UserUpdateOne) AddAssignedSubscriptionIDs(ids ...int64) *UserUpdateOne {
 	_u.mutation.AddAssignedSubscriptionIDs(ids...)
@@ -2369,6 +2466,27 @@ func (_u *UserUpdateOne) RemoveSubscriptions(v ...*UserSubscription) *UserUpdate
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveSubscriptionIDs(ids...)
+}
+
+// ClearBundleSubscriptions clears all "bundle_subscriptions" edges to the BundleSubscription entity.
+func (_u *UserUpdateOne) ClearBundleSubscriptions() *UserUpdateOne {
+	_u.mutation.ClearBundleSubscriptions()
+	return _u
+}
+
+// RemoveBundleSubscriptionIDs removes the "bundle_subscriptions" edge to BundleSubscription entities by IDs.
+func (_u *UserUpdateOne) RemoveBundleSubscriptionIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.RemoveBundleSubscriptionIDs(ids...)
+	return _u
+}
+
+// RemoveBundleSubscriptions removes "bundle_subscriptions" edges to BundleSubscription entities.
+func (_u *UserUpdateOne) RemoveBundleSubscriptions(v ...*BundleSubscription) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveBundleSubscriptionIDs(ids...)
 }
 
 // ClearAssignedSubscriptions clears all "assigned_subscriptions" edges to the UserSubscription entity.
@@ -2933,6 +3051,51 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.BundleSubscriptionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BundleSubscriptionsTable,
+			Columns: []string{user.BundleSubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(bundlesubscription.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedBundleSubscriptionsIDs(); len(nodes) > 0 && !_u.mutation.BundleSubscriptionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BundleSubscriptionsTable,
+			Columns: []string{user.BundleSubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(bundlesubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.BundleSubscriptionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.BundleSubscriptionsTable,
+			Columns: []string{user.BundleSubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(bundlesubscription.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

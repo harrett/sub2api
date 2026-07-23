@@ -311,6 +311,60 @@ func (_u *PaymentOrderUpdate) ClearPlanID() *PaymentOrderUpdate {
 	return _u
 }
 
+// SetBundlePlanID sets the "bundle_plan_id" field.
+func (_u *PaymentOrderUpdate) SetBundlePlanID(v int64) *PaymentOrderUpdate {
+	_u.mutation.ResetBundlePlanID()
+	_u.mutation.SetBundlePlanID(v)
+	return _u
+}
+
+// SetNillableBundlePlanID sets the "bundle_plan_id" field if the given value is not nil.
+func (_u *PaymentOrderUpdate) SetNillableBundlePlanID(v *int64) *PaymentOrderUpdate {
+	if v != nil {
+		_u.SetBundlePlanID(*v)
+	}
+	return _u
+}
+
+// AddBundlePlanID adds value to the "bundle_plan_id" field.
+func (_u *PaymentOrderUpdate) AddBundlePlanID(v int64) *PaymentOrderUpdate {
+	_u.mutation.AddBundlePlanID(v)
+	return _u
+}
+
+// ClearBundlePlanID clears the value of the "bundle_plan_id" field.
+func (_u *PaymentOrderUpdate) ClearBundlePlanID() *PaymentOrderUpdate {
+	_u.mutation.ClearBundlePlanID()
+	return _u
+}
+
+// SetBundleSubscriptionID sets the "bundle_subscription_id" field.
+func (_u *PaymentOrderUpdate) SetBundleSubscriptionID(v int64) *PaymentOrderUpdate {
+	_u.mutation.ResetBundleSubscriptionID()
+	_u.mutation.SetBundleSubscriptionID(v)
+	return _u
+}
+
+// SetNillableBundleSubscriptionID sets the "bundle_subscription_id" field if the given value is not nil.
+func (_u *PaymentOrderUpdate) SetNillableBundleSubscriptionID(v *int64) *PaymentOrderUpdate {
+	if v != nil {
+		_u.SetBundleSubscriptionID(*v)
+	}
+	return _u
+}
+
+// AddBundleSubscriptionID adds value to the "bundle_subscription_id" field.
+func (_u *PaymentOrderUpdate) AddBundleSubscriptionID(v int64) *PaymentOrderUpdate {
+	_u.mutation.AddBundleSubscriptionID(v)
+	return _u
+}
+
+// ClearBundleSubscriptionID clears the value of the "bundle_subscription_id" field.
+func (_u *PaymentOrderUpdate) ClearBundleSubscriptionID() *PaymentOrderUpdate {
+	_u.mutation.ClearBundleSubscriptionID()
+	return _u
+}
+
 // SetSubscriptionGroupID sets the "subscription_group_id" field.
 func (_u *PaymentOrderUpdate) SetSubscriptionGroupID(v int64) *PaymentOrderUpdate {
 	_u.mutation.ResetSubscriptionGroupID()
@@ -923,6 +977,24 @@ func (_u *PaymentOrderUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.PlanIDCleared() {
 		_spec.ClearField(paymentorder.FieldPlanID, field.TypeInt64)
 	}
+	if value, ok := _u.mutation.BundlePlanID(); ok {
+		_spec.SetField(paymentorder.FieldBundlePlanID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedBundlePlanID(); ok {
+		_spec.AddField(paymentorder.FieldBundlePlanID, field.TypeInt64, value)
+	}
+	if _u.mutation.BundlePlanIDCleared() {
+		_spec.ClearField(paymentorder.FieldBundlePlanID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.BundleSubscriptionID(); ok {
+		_spec.SetField(paymentorder.FieldBundleSubscriptionID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedBundleSubscriptionID(); ok {
+		_spec.AddField(paymentorder.FieldBundleSubscriptionID, field.TypeInt64, value)
+	}
+	if _u.mutation.BundleSubscriptionIDCleared() {
+		_spec.ClearField(paymentorder.FieldBundleSubscriptionID, field.TypeInt64)
+	}
 	if value, ok := _u.mutation.SubscriptionGroupID(); ok {
 		_spec.SetField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64, value)
 	}
@@ -1371,6 +1443,60 @@ func (_u *PaymentOrderUpdateOne) AddPlanID(v int64) *PaymentOrderUpdateOne {
 // ClearPlanID clears the value of the "plan_id" field.
 func (_u *PaymentOrderUpdateOne) ClearPlanID() *PaymentOrderUpdateOne {
 	_u.mutation.ClearPlanID()
+	return _u
+}
+
+// SetBundlePlanID sets the "bundle_plan_id" field.
+func (_u *PaymentOrderUpdateOne) SetBundlePlanID(v int64) *PaymentOrderUpdateOne {
+	_u.mutation.ResetBundlePlanID()
+	_u.mutation.SetBundlePlanID(v)
+	return _u
+}
+
+// SetNillableBundlePlanID sets the "bundle_plan_id" field if the given value is not nil.
+func (_u *PaymentOrderUpdateOne) SetNillableBundlePlanID(v *int64) *PaymentOrderUpdateOne {
+	if v != nil {
+		_u.SetBundlePlanID(*v)
+	}
+	return _u
+}
+
+// AddBundlePlanID adds value to the "bundle_plan_id" field.
+func (_u *PaymentOrderUpdateOne) AddBundlePlanID(v int64) *PaymentOrderUpdateOne {
+	_u.mutation.AddBundlePlanID(v)
+	return _u
+}
+
+// ClearBundlePlanID clears the value of the "bundle_plan_id" field.
+func (_u *PaymentOrderUpdateOne) ClearBundlePlanID() *PaymentOrderUpdateOne {
+	_u.mutation.ClearBundlePlanID()
+	return _u
+}
+
+// SetBundleSubscriptionID sets the "bundle_subscription_id" field.
+func (_u *PaymentOrderUpdateOne) SetBundleSubscriptionID(v int64) *PaymentOrderUpdateOne {
+	_u.mutation.ResetBundleSubscriptionID()
+	_u.mutation.SetBundleSubscriptionID(v)
+	return _u
+}
+
+// SetNillableBundleSubscriptionID sets the "bundle_subscription_id" field if the given value is not nil.
+func (_u *PaymentOrderUpdateOne) SetNillableBundleSubscriptionID(v *int64) *PaymentOrderUpdateOne {
+	if v != nil {
+		_u.SetBundleSubscriptionID(*v)
+	}
+	return _u
+}
+
+// AddBundleSubscriptionID adds value to the "bundle_subscription_id" field.
+func (_u *PaymentOrderUpdateOne) AddBundleSubscriptionID(v int64) *PaymentOrderUpdateOne {
+	_u.mutation.AddBundleSubscriptionID(v)
+	return _u
+}
+
+// ClearBundleSubscriptionID clears the value of the "bundle_subscription_id" field.
+func (_u *PaymentOrderUpdateOne) ClearBundleSubscriptionID() *PaymentOrderUpdateOne {
+	_u.mutation.ClearBundleSubscriptionID()
 	return _u
 }
 
@@ -2015,6 +2141,24 @@ func (_u *PaymentOrderUpdateOne) sqlSave(ctx context.Context) (_node *PaymentOrd
 	}
 	if _u.mutation.PlanIDCleared() {
 		_spec.ClearField(paymentorder.FieldPlanID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.BundlePlanID(); ok {
+		_spec.SetField(paymentorder.FieldBundlePlanID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedBundlePlanID(); ok {
+		_spec.AddField(paymentorder.FieldBundlePlanID, field.TypeInt64, value)
+	}
+	if _u.mutation.BundlePlanIDCleared() {
+		_spec.ClearField(paymentorder.FieldBundlePlanID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.BundleSubscriptionID(); ok {
+		_spec.SetField(paymentorder.FieldBundleSubscriptionID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedBundleSubscriptionID(); ok {
+		_spec.AddField(paymentorder.FieldBundleSubscriptionID, field.TypeInt64, value)
+	}
+	if _u.mutation.BundleSubscriptionIDCleared() {
+		_spec.ClearField(paymentorder.FieldBundleSubscriptionID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.SubscriptionGroupID(); ok {
 		_spec.SetField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64, value)

@@ -84,6 +84,7 @@ type CreateOrderRequest struct {
 	PaymentSource   string
 	OrderType       string
 	PlanID          int64
+	BundlePlanID    int64
 	Locale          string
 }
 
@@ -122,17 +123,18 @@ type OrderListParams struct {
 }
 
 type RefundPlan struct {
-	OrderID         int64
-	Order           *dbent.PaymentOrder
-	RefundAmount    float64
-	GatewayAmount   float64
-	Reason          string
-	Force           bool
-	DeductBalance   bool
-	DeductionType   string
-	BalanceToDeduct float64
-	SubDaysToDeduct int
-	SubscriptionID  int64
+	OrderID           int64
+	Order             *dbent.PaymentOrder
+	RefundAmount      float64
+	GatewayAmount     float64
+	Reason            string
+	Force             bool
+	DeductBalance     bool
+	DeductionType     string
+	BalanceToDeduct   float64
+	SubDaysToDeduct   int
+	SubscriptionID    int64
+	BundleRefundState *BundleRefundState
 }
 
 type RefundResult struct {
@@ -190,6 +192,7 @@ type PaymentService struct {
 	resumeService            *PaymentResumeService
 	affiliateService         *AffiliateService
 	notificationEmailService *NotificationEmailService
+	bundleSubscriptionSvc    *BundleSubscriptionService
 }
 
 func NewPaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository, affiliateService *AffiliateService) *PaymentService {
@@ -200,6 +203,12 @@ func NewPaymentService(entClient *dbent.Client, registry *payment.Registry, load
 
 func (s *PaymentService) SetNotificationEmailService(notificationEmailService *NotificationEmailService) {
 	s.notificationEmailService = notificationEmailService
+}
+
+// SetBundleSubscriptionService enables the opt-in bundle fulfillment adapter
+// without changing the existing payment provider constructor contract.
+func (s *PaymentService) SetBundleSubscriptionService(bundleSvc *BundleSubscriptionService) {
+	s.bundleSubscriptionSvc = bundleSvc
 }
 
 // --- Provider Registry ---

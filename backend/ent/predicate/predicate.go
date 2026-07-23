@@ -36,6 +36,18 @@ type BatchImageItem func(*sql.Selector)
 // BatchImageJob is the predicate function for batchimagejob builders.
 type BatchImageJob func(*sql.Selector)
 
+// BundlePlan is the predicate function for bundleplan builders.
+type BundlePlan func(*sql.Selector)
+
+// BundlePlanGroup is the predicate function for bundleplangroup builders.
+type BundlePlanGroup func(*sql.Selector)
+
+// BundleSubscription is the predicate function for bundlesubscription builders.
+type BundleSubscription func(*sql.Selector)
+
+// BundleSubscriptionEntitlement is the predicate function for bundlesubscriptionentitlement builders.
+type BundleSubscriptionEntitlement func(*sql.Selector)
+
 // ChannelMonitor is the predicate function for channelmonitor builders.
 type ChannelMonitor func(*sql.Selector)
 

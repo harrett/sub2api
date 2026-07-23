@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -20,6 +22,7 @@ func RegisterPaymentRoutes(
 	adminAuth middleware.AdminAuthMiddleware,
 	auditLog middleware.AuditLogMiddleware,
 	settingService *service.SettingService,
+	bundleHandlers ...*handler.BundleSubscriptionHandler,
 ) {
 	// --- User-facing payment endpoints (authenticated) ---
 	authenticated := v1.Group("/payment")
@@ -106,5 +109,41 @@ func RegisterPaymentRoutes(
 			providers.PUT("/:id", adminPaymentHandler.UpdateProvider)
 			providers.DELETE("/:id", adminPaymentHandler.DeleteProvider)
 		}
+	}
+
+	// Bundle subscriptions are registered only when the application wires the
+	// opt-in handler. Keeping this optional preserves the legacy route surface
+	// while allowing a feature-flagged deployment to add the new namespace.
+	if len(bundleHandlers) > 0 && bundleHandlers[0] != nil {
+		bundleGate := func(c *gin.Context) {
+			if settingService == nil || !settingService.IsBundleSubscriptionsEnabled(c.Request.Context()) {
+				c.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+			c.Next()
+		}
+		bundle := v1.Group("/bundle-subscriptions")
+		bundle.Use(gin.HandlerFunc(jwtAuth))
+		bundle.Use(middleware.BackendModeUserGuard(settingService))
+		bundle.Use(bundleGate)
+		bundle.GET("/plans", bundleHandlers[0].GetPlans)
+		bundle.GET("", bundleHandlers[0].GetMine)
+		bundle.POST("/:id/cancel", bundleHandlers[0].CancelMine)
+
+		adminBundle := v1.Group("/admin/bundle-subscriptions")
+		adminBundle.Use(gin.HandlerFunc(adminAuth))
+		adminBundle.Use(gin.HandlerFunc(auditLog))
+		adminBundle.Use(middleware.AdminComplianceGuard(settingService))
+		adminBundle.Use(bundleGate)
+		adminBundle.GET("/plans", bundleHandlers[0].AdminListPlans)
+		adminBundle.POST("/plans", bundleHandlers[0].AdminCreatePlan)
+		adminBundle.PUT("/plans/:id", bundleHandlers[0].AdminUpdatePlan)
+		adminBundle.DELETE("/plans/:id", bundleHandlers[0].AdminDeletePlan)
+		adminBundle.GET("", bundleHandlers[0].AdminListSubscriptions)
+		adminBundle.POST("/assign", bundleHandlers[0].AdminAssign)
+		adminBundle.POST("/:id/cancel", bundleHandlers[0].AdminCancel)
+		adminBundle.POST("/:id/extend", bundleHandlers[0].AdminExtend)
+		adminBundle.POST("/:id/reset-usage", bundleHandlers[0].AdminReset)
+		adminBundle.POST("/:id/revoke", bundleHandlers[0].AdminRevoke)
 	}
 }

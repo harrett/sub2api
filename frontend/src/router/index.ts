@@ -692,6 +692,12 @@ const routes: RouteRecordRaw[] = [
       requiresPayment: true
     }
   },
+  {
+    path: '/admin/bundle-subscriptions',
+    name: 'AdminBundleSubscriptions',
+    component: () => import('@/views/admin/BundleSubscriptionsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Cross-platform subscriptions', requiresPayment: true },
+  },
 
   // ==================== 404 Not Found ====================
   {

@@ -183,6 +183,34 @@ func (_c *PaymentOrderCreate) SetNillablePlanID(v *int64) *PaymentOrderCreate {
 	return _c
 }
 
+// SetBundlePlanID sets the "bundle_plan_id" field.
+func (_c *PaymentOrderCreate) SetBundlePlanID(v int64) *PaymentOrderCreate {
+	_c.mutation.SetBundlePlanID(v)
+	return _c
+}
+
+// SetNillableBundlePlanID sets the "bundle_plan_id" field if the given value is not nil.
+func (_c *PaymentOrderCreate) SetNillableBundlePlanID(v *int64) *PaymentOrderCreate {
+	if v != nil {
+		_c.SetBundlePlanID(*v)
+	}
+	return _c
+}
+
+// SetBundleSubscriptionID sets the "bundle_subscription_id" field.
+func (_c *PaymentOrderCreate) SetBundleSubscriptionID(v int64) *PaymentOrderCreate {
+	_c.mutation.SetBundleSubscriptionID(v)
+	return _c
+}
+
+// SetNillableBundleSubscriptionID sets the "bundle_subscription_id" field if the given value is not nil.
+func (_c *PaymentOrderCreate) SetNillableBundleSubscriptionID(v *int64) *PaymentOrderCreate {
+	if v != nil {
+		_c.SetBundleSubscriptionID(*v)
+	}
+	return _c
+}
+
 // SetSubscriptionGroupID sets the "subscription_group_id" field.
 func (_c *PaymentOrderCreate) SetSubscriptionGroupID(v int64) *PaymentOrderCreate {
 	_c.mutation.SetSubscriptionGroupID(v)
@@ -761,6 +789,14 @@ func (_c *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec)
 		_spec.SetField(paymentorder.FieldPlanID, field.TypeInt64, value)
 		_node.PlanID = &value
 	}
+	if value, ok := _c.mutation.BundlePlanID(); ok {
+		_spec.SetField(paymentorder.FieldBundlePlanID, field.TypeInt64, value)
+		_node.BundlePlanID = &value
+	}
+	if value, ok := _c.mutation.BundleSubscriptionID(); ok {
+		_spec.SetField(paymentorder.FieldBundleSubscriptionID, field.TypeInt64, value)
+		_node.BundleSubscriptionID = &value
+	}
 	if value, ok := _c.mutation.SubscriptionGroupID(); ok {
 		_spec.SetField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64, value)
 		_node.SubscriptionGroupID = &value
@@ -1165,6 +1201,54 @@ func (u *PaymentOrderUpsert) AddPlanID(v int64) *PaymentOrderUpsert {
 // ClearPlanID clears the value of the "plan_id" field.
 func (u *PaymentOrderUpsert) ClearPlanID() *PaymentOrderUpsert {
 	u.SetNull(paymentorder.FieldPlanID)
+	return u
+}
+
+// SetBundlePlanID sets the "bundle_plan_id" field.
+func (u *PaymentOrderUpsert) SetBundlePlanID(v int64) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldBundlePlanID, v)
+	return u
+}
+
+// UpdateBundlePlanID sets the "bundle_plan_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateBundlePlanID() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldBundlePlanID)
+	return u
+}
+
+// AddBundlePlanID adds v to the "bundle_plan_id" field.
+func (u *PaymentOrderUpsert) AddBundlePlanID(v int64) *PaymentOrderUpsert {
+	u.Add(paymentorder.FieldBundlePlanID, v)
+	return u
+}
+
+// ClearBundlePlanID clears the value of the "bundle_plan_id" field.
+func (u *PaymentOrderUpsert) ClearBundlePlanID() *PaymentOrderUpsert {
+	u.SetNull(paymentorder.FieldBundlePlanID)
+	return u
+}
+
+// SetBundleSubscriptionID sets the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsert) SetBundleSubscriptionID(v int64) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldBundleSubscriptionID, v)
+	return u
+}
+
+// UpdateBundleSubscriptionID sets the "bundle_subscription_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateBundleSubscriptionID() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldBundleSubscriptionID)
+	return u
+}
+
+// AddBundleSubscriptionID adds v to the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsert) AddBundleSubscriptionID(v int64) *PaymentOrderUpsert {
+	u.Add(paymentorder.FieldBundleSubscriptionID, v)
+	return u
+}
+
+// ClearBundleSubscriptionID clears the value of the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsert) ClearBundleSubscriptionID() *PaymentOrderUpsert {
+	u.SetNull(paymentorder.FieldBundleSubscriptionID)
 	return u
 }
 
@@ -1869,6 +1953,62 @@ func (u *PaymentOrderUpsertOne) UpdatePlanID() *PaymentOrderUpsertOne {
 func (u *PaymentOrderUpsertOne) ClearPlanID() *PaymentOrderUpsertOne {
 	return u.Update(func(s *PaymentOrderUpsert) {
 		s.ClearPlanID()
+	})
+}
+
+// SetBundlePlanID sets the "bundle_plan_id" field.
+func (u *PaymentOrderUpsertOne) SetBundlePlanID(v int64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBundlePlanID(v)
+	})
+}
+
+// AddBundlePlanID adds v to the "bundle_plan_id" field.
+func (u *PaymentOrderUpsertOne) AddBundlePlanID(v int64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddBundlePlanID(v)
+	})
+}
+
+// UpdateBundlePlanID sets the "bundle_plan_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateBundlePlanID() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBundlePlanID()
+	})
+}
+
+// ClearBundlePlanID clears the value of the "bundle_plan_id" field.
+func (u *PaymentOrderUpsertOne) ClearBundlePlanID() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearBundlePlanID()
+	})
+}
+
+// SetBundleSubscriptionID sets the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsertOne) SetBundleSubscriptionID(v int64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBundleSubscriptionID(v)
+	})
+}
+
+// AddBundleSubscriptionID adds v to the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsertOne) AddBundleSubscriptionID(v int64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddBundleSubscriptionID(v)
+	})
+}
+
+// UpdateBundleSubscriptionID sets the "bundle_subscription_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateBundleSubscriptionID() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBundleSubscriptionID()
+	})
+}
+
+// ClearBundleSubscriptionID clears the value of the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsertOne) ClearBundleSubscriptionID() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearBundleSubscriptionID()
 	})
 }
 
@@ -2801,6 +2941,62 @@ func (u *PaymentOrderUpsertBulk) UpdatePlanID() *PaymentOrderUpsertBulk {
 func (u *PaymentOrderUpsertBulk) ClearPlanID() *PaymentOrderUpsertBulk {
 	return u.Update(func(s *PaymentOrderUpsert) {
 		s.ClearPlanID()
+	})
+}
+
+// SetBundlePlanID sets the "bundle_plan_id" field.
+func (u *PaymentOrderUpsertBulk) SetBundlePlanID(v int64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBundlePlanID(v)
+	})
+}
+
+// AddBundlePlanID adds v to the "bundle_plan_id" field.
+func (u *PaymentOrderUpsertBulk) AddBundlePlanID(v int64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddBundlePlanID(v)
+	})
+}
+
+// UpdateBundlePlanID sets the "bundle_plan_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateBundlePlanID() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBundlePlanID()
+	})
+}
+
+// ClearBundlePlanID clears the value of the "bundle_plan_id" field.
+func (u *PaymentOrderUpsertBulk) ClearBundlePlanID() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearBundlePlanID()
+	})
+}
+
+// SetBundleSubscriptionID sets the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsertBulk) SetBundleSubscriptionID(v int64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBundleSubscriptionID(v)
+	})
+}
+
+// AddBundleSubscriptionID adds v to the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsertBulk) AddBundleSubscriptionID(v int64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddBundleSubscriptionID(v)
+	})
+}
+
+// UpdateBundleSubscriptionID sets the "bundle_subscription_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateBundleSubscriptionID() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBundleSubscriptionID()
+	})
+}
+
+// ClearBundleSubscriptionID clears the value of the "bundle_subscription_id" field.
+func (u *PaymentOrderUpsertBulk) ClearBundleSubscriptionID() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearBundleSubscriptionID()
 	})
 }
 
