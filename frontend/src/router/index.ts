@@ -293,7 +293,8 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/purchase',
     name: 'PurchaseSubscription',
-    component: () => import('@/views/user/PaymentView.vue'),
+    // Custom purchase UI lives beside the upstream page so upstream payment changes remain mergeable.
+    component: () => import('@/views/user/CustomPaymentView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
