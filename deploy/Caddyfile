@@ -53,10 +53,14 @@ api.sub2api.com {
 			compression off
 		}
 
-		# 故障转移
-		fail_duration 30s
-		max_fails 3
-		unhealthy_status 500 502 503 504
+		# 故障转移：单上游场景下必须禁用被动健康检查。
+		# unhealthy_status 会把后端的「业务级 5xx」当成节点故障（例如网关
+		# 选不到账号时返回的 503），攒够 max_fails 次就摘掉唯一的上游，
+		# 之后整站（后台 + SPA + 全部 API）一起被 Caddy 用 503 拒掉。
+		# 只有配置了多个 reverse_proxy 上游时才应该打开这几行。
+		# fail_duration 30s
+		# max_fails 3
+		# unhealthy_status 500 502 503 504
 	}
 
 	# =========================================================================
