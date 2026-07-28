@@ -33,6 +33,11 @@ api.sub2api.com {
 		health_interval 30s
 		health_timeout 10s
 		health_status 200
+		# 连续 3 次探测失败才摘除上游，避免单次抖动（如负载尖峰导致探测
+		# 超时）误伤整站。/health 是静态 handler，不查库、不碰账号池，
+		# 只有后端进程真的死了才会失败。
+		health_fails 3
+		health_passes 1
 
 		# 负载均衡策略（单节点可忽略，多节点时有用）
 		lb_policy round_robin
