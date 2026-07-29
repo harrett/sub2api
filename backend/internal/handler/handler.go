@@ -58,10 +58,12 @@ type Handlers struct {
 	OpenAIGateway      *OpenAIGatewayHandler
 	Setting            *SettingHandler
 	Totp               *TotpHandler
+	Passkey            *PasskeyHandler
 	Payment            *PaymentHandler
 	PaymentWebhook     *PaymentWebhookHandler
 	BundleSubscription *BundleSubscriptionHandler
 	AvailableChannel   *AvailableChannelHandler
+	ModelPlaza         *ModelPlazaHandler
 	AsyncImage         *AsyncImageHandler
 	BatchImage         *BatchImageHandler
 }
