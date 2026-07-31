@@ -95,15 +95,6 @@
 
         <!-- Iframe embed mode -->
         <div v-else class="custom-embed-shell">
-          <a
-            :href="embeddedUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="btn btn-secondary btn-sm custom-open-fab"
-          >
-            <Icon name="externalLink" size="sm" class="mr-1.5" :stroke-width="2" />
-            {{ t('customPage.openInNewTab') }}
-          </a>
           <iframe
             :src="embeddedUrl"
             class="custom-embed-frame"
