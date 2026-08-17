@@ -1453,7 +1453,9 @@ func TestAPIKeyAuthOpenAIQuotaErrorFormat(t *testing.T) {
 	req.Header.Set("x-api-key", apiKey.Key)
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusTooManyRequests, w.Code)
+	// fork: 额度耗尽改用 402，避免 Codex CLI 把 429 吞进自动重试链，
+	// 用户要等整轮退避才看得到错误（可用 SUB2API_QUOTA_ERROR_STATUS 改回）。
+	require.Equal(t, http.StatusPaymentRequired, w.Code)
 	var response struct {
 		Error struct {
 			Message string  `json:"message"`
@@ -1463,13 +1465,18 @@ func TestAPIKeyAuthOpenAIQuotaErrorFormat(t *testing.T) {
 		} `json:"error"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-	require.Equal(t, "API key 额度已用完", response.Error.Message)
+	// fork: 原始文案仍在，另外追加了责任方标签和可操作指引，
+	// 让用户知道这是自己的额度问题而非服务器故障（见 gateway_error_format.go）。
+	require.Contains(t, response.Error.Message, "API key 额度已用完")
+	require.Contains(t, response.Error.Message, "账户额度问题")
 	require.Equal(t, "insufficient_quota", response.Error.Type)
 	require.Nil(t, response.Error.Param)
-	require.Equal(t, "insufficient_quota", response.Error.Code)
+	require.Equal(t, "api_key_quota_exhausted", response.Error.Code)
 }
 
-func TestAPIKeyAuthQuotaErrorKeepsLegacyFormatOutsideResponses(t *testing.T) {
+// fork: upstream 原本断言 /responses 以外的路径保留内部信封格式。现在所有网关
+// 路径都按调用方协议输出，/v1/messages 走 Anthropic 形状。
+func TestAPIKeyAuthQuotaErrorUsesAnthropicFormatOnMessages(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	user := &service.User{ID: 11, Role: service.RoleUser, Status: service.StatusActive, Balance: 10}
@@ -1495,8 +1502,19 @@ func TestAPIKeyAuthQuotaErrorKeepsLegacyFormatOutsideResponses(t *testing.T) {
 	req.Header.Set("x-api-key", apiKey.Key)
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusTooManyRequests, w.Code)
-	requireAPIKeyAuthError(t, w, "API_KEY_QUOTA_EXHAUSTED", "API key 额度已用完")
+	require.Equal(t, http.StatusPaymentRequired, w.Code)
+	var response struct {
+		Type  string `json:"type"`
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, "error", response.Type)
+	require.Equal(t, "invalid_request_error", response.Error.Type)
+	require.Contains(t, response.Error.Message, "API key 额度已用完")
+	require.Contains(t, response.Error.Message, "账户额度问题")
 }
 
 func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) *gin.Engine {

@@ -54,7 +54,9 @@ func TestAPIKeyAuthInvalidAbuseReturns429BeforeRepository(t *testing.T) {
 	r.ServeHTTP(w, httpRequest(t, "/v1/messages", "", "another-random-key"))
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	require.Equal(t, "60", w.Header().Get("Retry-After"))
-	require.Contains(t, w.Body.String(), "INVALID_AUTH_RATE_LIMITED")
+	// fork: 网关路径现在按调用方协议输出错误体（见 gateway_error_format.go），
+	// /v1/messages 走 Anthropic 形状，内部 code 不再出现在响应里。
+	require.Contains(t, w.Body.String(), "rate_limit_error")
 	require.Equal(t, IngressRejectInvalidAuthRateLimited, reason)
 	require.Equal(t, 1, repoCalls, "rate-limited request must not reach the repository")
 }
