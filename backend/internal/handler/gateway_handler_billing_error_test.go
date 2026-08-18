@@ -36,7 +36,10 @@ func TestBillingErrorDetails_APIKeyRateLimitStillMaps(t *testing.T) {
 		service.ErrAPIKeyRateLimit7dExceeded,
 	} {
 		status, code, _, _ := billingErrorDetails(err)
-		require.Equal(t, http.StatusTooManyRequests, status, "status for %v", err)
+		// fork: 5h/1d/7d 窗口重置要等数小时到数天，429 会被 OpenAI 兼容客户端
+		// 吞进重试链（几秒内重试几次就放弃并丢掉响应体），用户看不到真实原因。
+		// 改用 quotaErrorStatus（默认 402，SUB2API_QUOTA_ERROR_STATUS 可调）。
+		require.Equal(t, http.StatusPaymentRequired, status, "status for %v", err)
 		require.Equal(t, "rate_limit_exceeded", code)
 	}
 }
@@ -114,8 +117,15 @@ func TestBillingErrorDetails_T10_QuotaExhaustedReturns429WithRetryAfter(t *testi
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			status, code, _, retryAfter := billingErrorDetails(tc.err)
-			if status != http.StatusTooManyRequests {
-				t.Errorf("status = %d, want 429", status)
+			// fork: upstream 把这里从 403 改成 429，本意是让 SDK 按 Retry-After
+			// 自动退避。但实测 Codex CLI 面对 Retry-After=3600 并不会真的等，
+			// 而是在几秒内重试几次后打印
+			// "exceeded retry limit, last status: 429 Too Many Requests"
+			// 并丢弃响应体 —— 用户永远看不到「配额用完了」。
+			// 故改用不可重试的 quotaErrorStatus；Retry-After 仍照常下发，
+			// 真正尊重它的 SDK 不受影响。
+			if status != http.StatusPaymentRequired {
+				t.Errorf("status = %d, want 402", status)
 			}
 			if code != "rate_limit_exceeded" {
 				t.Errorf("code = %q, want rate_limit_exceeded", code)

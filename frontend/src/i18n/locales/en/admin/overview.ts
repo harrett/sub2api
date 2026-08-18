@@ -514,7 +514,7 @@ export default {
         selectStatus: 'Select status',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
-        rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.'
+        rpmLimitHint: 'Global per-minute request ceiling for this user across all groups; 0 = unlimited. Enforced alongside the group RPM limit — the stricter one wins, and a group setting never overrides it.'
       },
       columns: {
         user: 'User',
@@ -853,7 +853,7 @@ export default {
         rateMultiplierHint: '1.0 = standard rate, 0.5 = half price, 2.0 = double',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
-        rpmLimitHint: 'Max requests per minute for each user in this group; 0 = unlimited. Once set, it takes over per-user rate limiting in this group (overrides the user-level rpm_limit fallback).',
+        rpmLimitHint: 'Max requests per minute for each user in this group; 0 = unlimited. Enforced alongside the user-level rpm_limit — the stricter one wins, and this never overrides the user-level ceiling.',
         maxReasoningEffort: 'Max reasoning effort',
         maxReasoningEffortUnlimited: 'Unlimited (follow request)',
         maxReasoningEffortHint: 'Limits explicit OpenAI reasoning effort requests only. For Composite groups, it applies only to requests resolved to OpenAI. Higher values are capped; omitted effort stays omitted. The ceiling takes precedence over reasoning effort mappings.',

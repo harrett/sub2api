@@ -2317,7 +2317,10 @@ func extractQuotaResetSeconds(err error) int {
 	return int(math.Ceil(secs))
 }
 
-func billingErrorDetails(err error) (status int, code, message string, retryAfter int) {
+// upstreamBillingErrorDetails 是 upstream 的原始映射，函数体保持原样。
+// 对外入口 billingErrorDetails 在 billing_error_presentation.go 里包了一层，
+// 统一补上责任方标签、可操作指引与额度类状态码。
+func upstreamBillingErrorDetails(err error) (status int, code, message string, retryAfter int) {
 	if errors.Is(err, service.ErrBillingServiceUnavailable) {
 		msg := pkgerrors.Message(err)
 		if msg == "" {

@@ -175,7 +175,62 @@ var platformErrorGuidance = map[string]errorGuidance{
 		hint:  "该 Key 所属的专属分组已不再允许你使用，请联系管理员。",
 	},
 
+	// ── 计费/限流侧：由 handler 层 billingErrorDetails 经
+	//    PlatformErrorPresentation 复用，保证两条链路措辞一致 ──────
+	//
+	// 长周期配额重试没有意义（重置要等数小时到数十天），必须改用
+	// quotaErrorStatus —— 原本返回 429 + Retry-After=数万秒，客户端在几秒内
+	// 重试几次就放弃并丢掉响应体，用户永远看不到真实原因。
+	"USER_PLATFORM_DAILY_QUOTA_EXHAUSTED": {
+		label:  "账户额度问题",
+		hint:   "该平台的每日用量配额已用完，这不是服务器故障。请等待次日重置，或升级套餐。",
+		link:   linkPurchase,
+		status: quotaErrorStatus,
+	},
+	"USER_PLATFORM_WEEKLY_QUOTA_EXHAUSTED": {
+		label:  "账户额度问题",
+		hint:   "该平台的每周用量配额已用完，这不是服务器故障。请等待下周重置，或升级套餐。",
+		link:   linkPurchase,
+		status: quotaErrorStatus,
+	},
+	"USER_PLATFORM_MONTHLY_QUOTA_EXHAUSTED": {
+		label:  "账户额度问题",
+		hint:   "该平台的每月用量配额已用完，这不是服务器故障。请等待下月重置，或升级套餐。",
+		link:   linkPurchase,
+		status: quotaErrorStatus,
+	},
+	// API Key 上的 5h/1d/7d 速率限额由管理员配置，用户自己改不了，不给购买链接。
+	"API_KEY_RATE_5H_EXCEEDED": {
+		label:  "账户额度问题",
+		hint:   "该 API Key 的 5 小时限额已用完，这不是服务器故障。请等待窗口重置，或联系管理员调整限额。",
+		status: quotaErrorStatus,
+	},
+	"API_KEY_RATE_1D_EXCEEDED": {
+		label:  "账户额度问题",
+		hint:   "该 API Key 的单日限额已用完，这不是服务器故障。请等待次日重置，或联系管理员调整限额。",
+		status: quotaErrorStatus,
+	},
+	"API_KEY_RATE_7D_EXCEEDED": {
+		label:  "账户额度问题",
+		hint:   "该 API Key 的 7 天限额已用完，这不是服务器故障。请等待窗口重置，或联系管理员调整限额。",
+		status: quotaErrorStatus,
+	},
+	// RPM 刻意保持 429：窗口 60 秒内就重置，Retry-After + SDK 自动退避能真正恢复，
+	// 换成不可重试的状态码反而让客户端直接失败。
+	"USER_RPM_EXCEEDED": {
+		label: "账户限流问题",
+		hint:  "你的请求频率超过了账号的每分钟上限，这不是服务器故障。请降低并发或稍等一分钟后重试。",
+	},
+	"GROUP_RPM_EXCEEDED": {
+		label: "账户限流问题",
+		hint:  "你的请求频率超过了该分组的每分钟上限，这不是服务器故障。请降低并发或稍等一分钟后重试。",
+	},
+
 	// ── 服务器侧：用户做什么都没用，别让他去充值 ──────────────────
+	"BILLING_SERVICE_ERROR": {
+		label: "服务器侧问题",
+		hint:  "计费服务暂时不可用，与你的账户余额和套餐额度无关。请稍后重试。",
+	},
 	"API_KEY_AUTH_OVERLOADED": {
 		label: "服务器侧问题",
 		hint:  "鉴权服务暂时过载，与你的账户余额和套餐额度无关。请稍后重试。",
@@ -188,6 +243,26 @@ var platformErrorGuidance = map[string]errorGuidance{
 		label: "服务器侧问题",
 		hint:  "订阅用量窗口维护失败，与你的账户余额和套餐额度无关。请联系管理员。",
 	},
+}
+
+// PlatformErrorPresentation 让 handler 层复用这里的责任方标签、可操作指引与
+// 额度类状态码策略，保证「中间件拦截」和「计费检查拒绝」两条链路对用户的措辞
+// 完全一致。
+//
+// reason 取自 pkg/errors 的 Reason（如 USER_PLATFORM_MONTHLY_QUOTA_EXHAUSTED）。
+// 未登记的 reason 只清洗消息、不改状态码，因此对未知错误是安全的空操作。
+//
+// 注意这里只负责「状态码 + 文案」；响应体的协议形状仍由各 handler 自己的
+// writer 决定，它们本来就已经按平台输出正确格式。
+func PlatformErrorPresentation(reason string, statusCode int, message string) (int, string) {
+	guidance, ok := platformErrorGuidance[reason]
+	if !ok {
+		return statusCode, unwrapApplicationErrorMessage(message)
+	}
+	if guidance.status > 0 {
+		statusCode = guidance.status
+	}
+	return statusCode, clientFacingMessage(guidance, true, message)
 }
 
 // gatewayErrorResponse 把平台错误渲染成调用方能解析的形状。

@@ -579,7 +579,7 @@ export default {
         selectStatus: '选择状态',
         rpmLimit: '每分钟请求数 (RPM)',
         rpmLimitPlaceholder: '0 表示不限制',
-        rpmLimitHint: '该用户每分钟最大请求数，0 = 不限制；仅在所用分组未设置 rpm_limit 时作为兜底生效'
+        rpmLimitHint: '该用户跨所有分组的每分钟请求数全局硬上限，0 = 不限制；与分组 RPM 同时生效，取更严格的一个（不会被分组设置覆盖）'
       },
       adjustBalance: '调整余额',
       adjustConcurrency: '调整并发数',
@@ -835,7 +835,7 @@ export default {
         rateMultiplierHint: '1.0 = 标准费率，0.5 = 半价，2.0 = 双倍',
         rpmLimit: '每分钟请求数 (RPM)',
         rpmLimitPlaceholder: '0 表示不限制',
-        rpmLimitHint: '每用户在本分组每分钟最大请求数，0 = 不限制；一旦设置即接管该用户的限流（覆盖用户级 rpm_limit）',
+        rpmLimitHint: '每用户在本分组每分钟最大请求数，0 = 不限制；与用户级 rpm_limit 同时生效，取更严格的一个（不会覆盖用户级上限）',
         maxReasoningEffort: '推理强度上限',
         maxReasoningEffortUnlimited: '不限制（跟随请求）',
         maxReasoningEffortHint: '仅限制客户端主动请求的 OpenAI reasoning effort；Composite 分组仅对解析到 OpenAI 的请求生效。超过上限时自动降档，不会为缺省请求主动开启推理。上限优先级高于推理强度映射。',
