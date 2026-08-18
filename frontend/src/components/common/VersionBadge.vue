@@ -114,43 +114,8 @@
                 </p>
               </div>
 
-              <!-- Priority 1: Update error (must check before hasUpdate) -->
-              <div v-if="updateError" class="space-y-2">
-                <div
-                  class="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800/50 dark:bg-red-900/20"
-                >
-                  <div
-                    class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50"
-                  >
-                    <Icon
-                      name="x"
-                      size="sm"
-                      :stroke-width="2"
-                      class="text-red-600 dark:text-red-400"
-                    />
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium text-red-700 dark:text-red-300">
-                      {{ t('version.updateFailed') }}
-                    </p>
-                    <p class="truncate text-xs text-red-600/70 dark:text-red-400/70">
-                      {{ updateError }}
-                    </p>
-                  </div>
-                </div>
-
-                <!-- Retry button -->
-                <button
-                  @click="handleUpdate"
-                  :disabled="updating"
-                  class="flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {{ t('version.retry') }}
-                </button>
-              </div>
-
-              <!-- Priority 2: Update success - need restart -->
-              <div v-else-if="updateSuccess && needRestart" class="space-y-2">
+              <!-- Priority 1: Rollback success - need restart -->
+              <div v-if="updateSuccess && needRestart" class="space-y-2">
                 <div
                   class="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800/50 dark:bg-green-900/20"
                 >
@@ -169,11 +134,7 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-green-700 dark:text-green-300">
-                      {{
-                        successKind === 'rollback'
-                          ? t('version.rollbackComplete')
-                          : t('version.updateComplete')
-                      }}
+                      {{ t('version.rollbackComplete') }}
                     </p>
                     <p class="text-xs text-green-600/70 dark:text-green-400/70">
                       {{ t('version.restartRequired') }}
@@ -231,8 +192,9 @@
                 </button>
               </div>
 
-              <!-- Priority 3: Update available for source build - show git pull hint -->
-              <div v-else-if="hasUpdate && !isReleaseBuild" class="space-y-2">
+              <!-- Priority 2: Update available - informational only, updates are done
+                   out-of-band because this is a downstream fork build -->
+              <div v-else-if="hasUpdate" class="space-y-2">
                 <a
                   v-if="releaseInfo?.html_url && releaseInfo.html_url !== '#'"
                   :href="releaseInfo.html_url"
@@ -270,6 +232,7 @@
                 </a>
                 <!-- Source build hint -->
                 <div
+                  v-if="!isReleaseBuild"
                   class="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-2 dark:border-blue-800/50 dark:bg-blue-900/20"
                 >
                   <svg
@@ -291,71 +254,7 @@
                 </div>
               </div>
 
-              <!-- Priority 4: Update available for release build - show update button -->
-              <div v-else-if="hasUpdate && isReleaseBuild" class="space-y-2">
-                <!-- Update info card -->
-                <div
-                  class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-900/20"
-                >
-                <div
-                  class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50"
-                >
-                  <Icon
-                    name="download"
-                    size="sm"
-                    :stroke-width="2"
-                    class="text-amber-600 dark:text-amber-400"
-                  />
-                </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium text-amber-700 dark:text-amber-300">
-                      {{ t('version.updateAvailable') }}
-                    </p>
-                    <p class="text-xs text-amber-600/70 dark:text-amber-400/70">
-                      v{{ latestVersion }}
-                    </p>
-                  </div>
-                </div>
-
-                <!-- Update button -->
-                <button
-                  @click="handleUpdate"
-                  :disabled="updating"
-                  class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <svg v-if="updating" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle
-                      class="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      stroke-width="4"
-                    ></circle>
-                    <path
-                      class="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  <Icon v-else name="download" size="sm" :stroke-width="2" />
-                  {{ updating ? t('version.updating') : t('version.updateNow') }}
-                </button>
-
-                <!-- View release link -->
-                <a
-                  v-if="releaseInfo?.html_url && releaseInfo.html_url !== '#'"
-                  :href="releaseInfo.html_url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex items-center justify-center gap-1 text-xs text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-dark-200"
-                >
-                  {{ t('version.viewChangelog') }}
-                  <Icon name="externalLink" size="xs" :stroke-width="2" />
-                </a>
-              </div>
-
-              <!-- Priority 5: Up to date - GitHub link + version rollback -->
+              <!-- Priority 3: Up to date - GitHub link + version rollback -->
               <div v-else class="space-y-2">
                 <a
                   v-if="releaseInfo?.html_url && releaseInfo.html_url !== '#'"
@@ -642,7 +541,6 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import {
-  performUpdate,
   restartService,
   getRollbackVersions,
   rollback as rollbackAPI,
@@ -673,19 +571,70 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const loading = computed(() => appStore.versionLoading)
 const currentVersion = computed(() => appStore.currentVersion || props.version || '')
 const latestVersion = computed(() => appStore.latestVersion)
-const hasUpdate = computed(() => appStore.hasUpdate)
 const releaseInfo = computed(() => appStore.releaseInfo)
 const buildType = computed(() => appStore.buildType)
 
-// Update process states (local to this component)
-const updating = ref(false)
+// This is a downstream fork: versions are `v{upstream}-{feat|fix}{N}`
+// (e.g. 0.1.178-feat4, 0.1.178-fix1, 0.1.178-feat4-fix1) and are always AHEAD of
+// the upstream release they are based on. The backend compares versions numerically
+// per dotted segment, so `178-feat4` fails to parse and degrades to 0, making an
+// identical upstream release look like an update. Recompute here instead of
+// trusting `has_update`.
+const FORK_TAG_RANK = { feat: 1, fix: 2 } as const
+type ForkTag = keyof typeof FORK_TAG_RANK
+
+interface ForkSuffix {
+  rank: number
+  num: number
+}
+
+interface ParsedVersion {
+  core: [number, number, number]
+  // Ordered fork suffixes; empty for a plain upstream release
+  fork: ForkSuffix[]
+}
+
+function parseVersion(raw: string): ParsedVersion | null {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)((?:-(?:feat|fix)\d+)*)/i.exec(raw.trim())
+  if (!match) return null
+  const fork = [...match[4].matchAll(/-(feat|fix)(\d+)/gi)].map((m) => ({
+    rank: FORK_TAG_RANK[m[1].toLowerCase() as ForkTag],
+    num: Number(m[2])
+  }))
+  return {
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    fork
+  }
+}
+
+function compareVersions(a: ParsedVersion, b: ParsedVersion): number {
+  for (let i = 0; i < 3; i++) {
+    if (a.core[i] !== b.core[i]) return a.core[i] < b.core[i] ? -1 : 1
+  }
+  // Same upstream base: any fork build outranks the plain upstream release, a fix
+  // outranks the feat build it patches, and a longer suffix chain is newer
+  const len = Math.min(a.fork.length, b.fork.length)
+  for (let i = 0; i < len; i++) {
+    if (a.fork[i].rank !== b.fork[i].rank) return a.fork[i].rank < b.fork[i].rank ? -1 : 1
+    if (a.fork[i].num !== b.fork[i].num) return a.fork[i].num < b.fork[i].num ? -1 : 1
+  }
+  if (a.fork.length !== b.fork.length) return a.fork.length < b.fork.length ? -1 : 1
+  return 0
+}
+
+const hasUpdate = computed(() => {
+  const current = parseVersion(currentVersion.value)
+  const latest = parseVersion(latestVersion.value)
+  // Unparseable versions (dev builds, empty state): fall back to the backend verdict
+  if (!current || !latest) return appStore.hasUpdate
+  return compareVersions(current, latest) < 0
+})
+
+// Restart / rollback process states (local to this component)
 const restarting = ref(false)
 const needRestart = ref(false)
-const updateError = ref('')
 const updateSuccess = ref(false)
 const restartCountdown = ref(0)
-// Distinguishes the success + restart panel between update and rollback flows
-const successKind = ref<'update' | 'rollback'>('update')
 
 // Rollback states
 const rollbackPanelOpen = ref(false)
@@ -743,34 +692,11 @@ async function refreshVersion(force = true) {
   if (!isAdmin.value) return
 
   // Reset update states when refreshing
-  updateError.value = ''
   updateSuccess.value = false
   needRestart.value = false
   resetRollbackState()
 
   await appStore.fetchVersion(force)
-}
-
-async function handleUpdate() {
-  if (updating.value) return
-
-  updating.value = true
-  updateError.value = ''
-  updateSuccess.value = false
-
-  try {
-    const result = await performUpdate()
-    successKind.value = 'update'
-    updateSuccess.value = true
-    needRestart.value = result.need_restart
-    // Clear version cache to reflect update completed
-    appStore.clearVersionCache()
-  } catch (error: unknown) {
-    const err = error as { response?: { data?: { message?: string } }; message?: string }
-    updateError.value = err.response?.data?.message || err.message || t('version.updateFailed')
-  } finally {
-    updating.value = false
-  }
 }
 
 function resetRollbackState() {
@@ -834,7 +760,6 @@ async function handleRollback() {
 
   try {
     const result = await rollbackAPI(selectedRollbackVersion.value)
-    successKind.value = 'rollback'
     updateSuccess.value = true
     needRestart.value = result.need_restart
     rollbackPanelOpen.value = false
