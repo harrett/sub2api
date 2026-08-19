@@ -123,7 +123,12 @@
           @openErrorDetail="openError"
         />
 
-        <OpsErrorDetailModal v-model:show="showErrorModal" :error-id="selectedErrorId" :error-type="errorDetailsType" />
+        <OpsErrorDetailModal
+          v-model:show="showErrorModal"
+          :error-id="selectedErrorId"
+          :error-type="errorDetailsType"
+          :z-index="60"
+        />
 
         <OpsRequestDetailsModal
           v-model="showRequestDetails"
@@ -508,9 +513,8 @@ function onQueryModeChange(v: string | number | boolean | null) {
 
 function openError(id: number) {
   selectedErrorId.value = id
-  // Ensure only one modal visible at a time.
-  showErrorDetails.value = false
-  showRequestDetails.value = false
+  // Stack the detail modal on top of the list modal it was opened from,
+  // so closing it returns to the list instead of dismissing everything.
   showErrorModal.value = true
 }
 

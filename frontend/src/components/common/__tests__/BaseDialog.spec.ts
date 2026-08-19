@@ -34,4 +34,32 @@ describe('BaseDialog', () => {
     expect(document.body.querySelector<HTMLElement>('.modal-body')?.scrollTop).toBe(0)
     wrapper.unmount()
   })
+
+  it('keeps scroll lock and only closes the top dialog when nested', async () => {
+    const parent = mount(BaseDialog, {
+      attachTo: document.body,
+      props: { show: true, title: 'Parent' },
+      global: { stubs: { Icon: true } }
+    })
+    const child = mount(BaseDialog, {
+      attachTo: document.body,
+      props: { show: true, title: 'Child' },
+      global: { stubs: { Icon: true } }
+    })
+    await nextTick()
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(child.emitted('close')).toHaveLength(1)
+    expect(parent.emitted('close')).toBeUndefined()
+
+    // Closing the child must not release the scroll lock held by the parent.
+    await child.setProps({ show: false })
+    expect(document.body.classList.contains('modal-open')).toBe(true)
+
+    await parent.setProps({ show: false })
+    expect(document.body.classList.contains('modal-open')).toBe(false)
+
+    child.unmount()
+    parent.unmount()
+  })
 })
