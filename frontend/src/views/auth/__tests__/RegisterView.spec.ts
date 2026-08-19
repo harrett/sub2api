@@ -179,9 +179,35 @@ describe('RegisterView invitation layout', () => {
     await flushPromises()
 
     expect(registerMock).not.toHaveBeenCalled()
-    // 校验失败通过 validationToastMessage watcher 弹 toast
+    // 校验失败时直接弹 toast
     expect(showErrorMock).toHaveBeenCalledWith('auth.emailSuffixNotAllowedWithAllowed')
     expect(wrapper.get('#email').classes()).toContain('input-error')
+  })
+
+  // 重复提交同一个非法邮箱时错误文案不变，早期实现依赖 watch 只弹一次，第二次点击毫无反馈。
+  it('re-shows the same validation toast on every submit attempt', async () => {
+    getPublicSettingsMock.mockResolvedValueOnce({
+      ...publicSettings,
+      turnstile_enabled: false,
+      registration_email_suffix_whitelist: ['allowed.com']
+    })
+
+    const wrapper = mountRegister()
+    await flushPromises()
+    await wrapper.get('#email').setValue('first@custom.example')
+    await wrapper.get('#password').setValue('secret-123')
+
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(registerMock).not.toHaveBeenCalled()
+    expect(
+      showErrorMock.mock.calls.filter(
+        ([message]) => message === 'auth.emailSuffixNotAllowedWithAllowed'
+      )
+    ).toHaveLength(2)
   })
 
   it('still submits whitelisted email domains when the domain quota switch is disabled', async () => {

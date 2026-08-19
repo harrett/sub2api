@@ -200,7 +200,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
@@ -241,11 +241,14 @@ const validationToastMessage = computed(
   () => errors.password || errors.confirmPassword || ''
 )
 
-watch(validationToastMessage, (value, previousValue) => {
-  if (value && value !== previousValue) {
-    appStore.showError(value)
+// 每次提交失败都要弹提示：错误文案与上次相同时 watch 不会触发，
+// 会导致重复提交毫无反馈(既无 toast 也无请求)。
+function showValidationToast(): void {
+  const message = validationToastMessage.value
+  if (message) {
+    appStore.showError(message)
   }
-})
+}
 
 // Check if the reset link is valid (has email and token)
 const isInvalidLink = computed(() => !email.value || !token.value)
@@ -297,6 +300,7 @@ async function handleSubmit(): Promise<void> {
   errorMessage.value = ''
 
   if (!validateForm()) {
+    showValidationToast()
     return
   }
 

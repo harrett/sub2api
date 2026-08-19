@@ -222,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, watch } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
@@ -362,11 +362,14 @@ const showOAuthLogin = computed(
       googleOAuthEnabled.value)
 )
 
-watch(validationToastMessage, (value, previousValue) => {
-  if (value && value !== previousValue) {
-    appStore.showError(value)
+// 每次提交失败都要弹提示：错误文案与上次相同时 watch 不会触发，
+// 会导致重复提交毫无反馈(既无 toast 也无请求)。
+function showValidationToast(): void {
+  const message = validationToastMessage.value
+  if (message) {
+    appStore.showError(message)
   }
-})
+}
 
 // ==================== Lifecycle ====================
 
@@ -485,12 +488,14 @@ function onTurnstileExpire(): void {
   turnstileToken.value = ''
   tencentCaptchaRandstr.value = ''
   errors.turnstile = t('auth.turnstileExpired')
+  appStore.showError(errors.turnstile)
 }
 
 function onTurnstileError(): void {
   turnstileToken.value = ''
   tencentCaptchaRandstr.value = ''
   errors.turnstile = t('auth.turnstileFailed')
+  appStore.showError(errors.turnstile)
 }
 
 function resetCaptchaProof(): void {
@@ -564,6 +569,7 @@ async function handleLogin(): Promise<void> {
 
   // Validate form
   if (!validateForm()) {
+    showValidationToast()
     return
   }
 

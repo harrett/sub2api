@@ -178,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
@@ -315,11 +315,14 @@ const pendingOAuthCreateCaptchaEnabled = computed(
   () => isPendingOAuthFlow() && captchaEnabled.value
 )
 
-watch(validationToastMessage, (value, previousValue) => {
-  if (value && value !== previousValue) {
-    appStore.showError(value)
+// 每次提交失败都要弹提示：错误文案与上次相同时 watch 不会触发，
+// 会导致重复提交毫无反馈(既无 toast 也无请求)。
+function showValidationToast(): void {
+  const message = validationToastMessage.value
+  if (message) {
+    appStore.showError(message)
   }
-})
+}
 
 // ==================== Lifecycle ====================
 
@@ -427,12 +430,14 @@ function onTurnstileExpire(): void {
   resendTurnstileToken.value = ''
   resendTencentCaptchaRandstr.value = ''
   errors.value.turnstile = t('auth.turnstileExpired')
+  appStore.showError(errors.value.turnstile)
 }
 
 function onTurnstileError(): void {
   resendTurnstileToken.value = ''
   resendTencentCaptchaRandstr.value = ''
   errors.value.turnstile = t('auth.turnstileFailed')
+  appStore.showError(errors.value.turnstile)
 }
 
 function onCreateAccountTurnstileVerify(token: string, randstr = ''): void {
@@ -445,12 +450,14 @@ function onCreateAccountTurnstileExpire(): void {
   createAccountTurnstileToken.value = ''
   createAccountTencentCaptchaRandstr.value = ''
   errors.value.turnstile = t('auth.turnstileExpired')
+  appStore.showError(errors.value.turnstile)
 }
 
 function onCreateAccountTurnstileError(): void {
   createAccountTurnstileToken.value = ''
   createAccountTencentCaptchaRandstr.value = ''
   errors.value.turnstile = t('auth.turnstileFailed')
+  appStore.showError(errors.value.turnstile)
 }
 
 function resetCreateAccountTurnstile(): void {
@@ -657,6 +664,7 @@ async function handleVerify(): Promise<void> {
   errorMessage.value = ''
 
   if (!validateForm()) {
+    showValidationToast()
     return
   }
 

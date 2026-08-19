@@ -498,11 +498,19 @@ const registrationActionDisabled = computed(
   () => isLoading.value || !settingsLoaded.value || agreementGateActive.value
 )
 
-watch(validationToastMessage, (value, previousValue) => {
-  if (value && value !== previousValue) {
-    appStore.showError(value)
+// 每次提交失败都要弹提示：错误文案与上次相同时 watch 不会触发，
+// 会导致重复提交毫无反馈(既无 toast 也无请求)。
+function showValidationToast(): void {
+  const message = validationToastMessage.value
+  if (message) {
+    appStore.showError(message)
   }
-})
+}
+
+function failWithMessage(message: string): void {
+  errorMessage.value = message
+  appStore.showError(message)
+}
 
 function syncAffiliateReferralCode(): string {
   const code = resolveAffiliateReferralCode(route.query.aff, route.query.aff_code)
@@ -688,12 +696,14 @@ async function validatePromoCodeDebounced(code: string): Promise<void> {
       promoValidation.bonusAmount = null
       // 根据错误码显示对应的翻译
       promoValidation.message = getPromoErrorMessage(result.error_code)
+      appStore.showError(promoValidation.message)
     }
   } catch (error) {
     console.error('Failed to validate promo code:', error)
     promoValidation.valid = false
     promoValidation.invalid = true
     promoValidation.message = t('auth.promoCodeInvalid')
+    appStore.showError(promoValidation.message)
   } finally {
     promoValidating.value = false
   }
@@ -741,7 +751,12 @@ function handleInvitationCodeInput(): void {
   }, 500)
 }
 
-async function validateInvitationCodeDebounced(code: string): Promise<void> {
+async function validateInvitationCodeDebounced(
+  code: string,
+  options: { notify?: boolean } = {}
+): Promise<void> {
+  // notify=false 用于提交流程，避免与提交失败提示重复弹两条 toast
+  const notify = options.notify !== false
   invitationValidating.value = true
 
   try {
@@ -755,11 +770,13 @@ async function validateInvitationCodeDebounced(code: string): Promise<void> {
       invitationValidation.valid = false
       invitationValidation.invalid = true
       invitationValidation.message = getInvitationErrorMessage(result.error_code)
+      if (notify) appStore.showError(invitationValidation.message)
     }
   } catch {
     invitationValidation.valid = false
     invitationValidation.invalid = true
     invitationValidation.message = t('auth.invitationCodeInvalid')
+    if (notify) appStore.showError(invitationValidation.message)
   } finally {
     invitationValidating.value = false
   }
@@ -792,12 +809,14 @@ function onTurnstileExpire(): void {
   turnstileToken.value = ''
   tencentCaptchaRandstr.value = ''
   errors.turnstile = t('auth.turnstileExpired')
+  appStore.showError(errors.turnstile)
 }
 
 function onTurnstileError(): void {
   turnstileToken.value = ''
   tencentCaptchaRandstr.value = ''
   errors.turnstile = t('auth.turnstileFailed')
+  appStore.showError(errors.turnstile)
 }
 
 function resetCaptchaProof(): void {
@@ -945,6 +964,7 @@ async function handleRegister(): Promise<void> {
 
   // Validate form
   if (!validateForm()) {
+    showValidationToast()
     return
   }
 
@@ -952,12 +972,12 @@ async function handleRegister(): Promise<void> {
   if (formData.promo_code.trim()) {
     // If promo code is being validated, wait
     if (promoValidating.value) {
-      errorMessage.value = t('auth.promoCodeValidating')
+      failWithMessage(t('auth.promoCodeValidating'))
       return
     }
     // If promo code is invalid, block submission
     if (promoValidation.invalid) {
-      errorMessage.value = t('auth.promoCodeInvalidCannotRegister')
+      failWithMessage(t('auth.promoCodeInvalidCannotRegister'))
       return
     }
   }
@@ -966,21 +986,20 @@ async function handleRegister(): Promise<void> {
   if (invitationCodeEnabled.value) {
     // If still validating, wait
     if (invitationValidating.value) {
-      errorMessage.value = t('auth.invitationCodeValidating')
+      failWithMessage(t('auth.invitationCodeValidating'))
       return
     }
     // If invitation code is invalid, block submission
     if (invitationValidation.invalid) {
-      errorMessage.value = t('auth.invitationCodeInvalidCannotRegister')
+      failWithMessage(t('auth.invitationCodeInvalidCannotRegister'))
       return
     }
     // If invitation code is required but not validated yet
     if (formData.invitation_code.trim() && !invitationValidation.valid) {
-      errorMessage.value = t('auth.invitationCodeValidating')
       // Trigger validation
-      await validateInvitationCodeDebounced(formData.invitation_code.trim())
+      await validateInvitationCodeDebounced(formData.invitation_code.trim(), { notify: false })
       if (!invitationValidation.valid) {
-        errorMessage.value = t('auth.invitationCodeInvalidCannotRegister')
+        failWithMessage(t('auth.invitationCodeInvalidCannotRegister'))
         return
       }
     }
