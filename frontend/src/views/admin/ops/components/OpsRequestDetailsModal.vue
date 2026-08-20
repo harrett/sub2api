@@ -142,7 +142,7 @@ async function handleCopyRequestId(requestId: string) {
 
 function openErrorDetail(errorId: number | null | undefined) {
   if (!errorId) return
-  close()
+  // Keep this list open; the detail modal stacks on top of it.
   emit('openErrorDetail', errorId)
 }
 

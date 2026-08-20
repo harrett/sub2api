@@ -120,13 +120,13 @@
           :group-id="groupId"
           :error-type="errorDetailsType"
           @update:show="showErrorDetails = $event"
-          @openErrorDetail="openError"
+          @openErrorDetail="openError($event, errorDetailsType)"
         />
 
         <OpsErrorDetailModal
           v-model:show="showErrorModal"
           :error-id="selectedErrorId"
-          :error-type="errorDetailsType"
+          :error-type="selectedErrorType"
           :z-index="60"
         />
 
@@ -136,7 +136,7 @@
           :preset="requestDetailsPreset"
           :platform="platform"
           :group-id="groupId"
-          @openErrorDetail="openError"
+          @openErrorDetail="openError($event, 'request')"
         />
       </template>
     </div>
@@ -370,6 +370,9 @@ const errorDistribution = ref<OpsErrorDistributionResponse | null>(null)
 const loadingErrorDistribution = ref(false)
 
 const selectedErrorId = ref<number | null>(null)
+// Kind of the error the detail modal shows; set by whichever list opened it,
+// so it stays correct independent of the last list type the user browsed.
+const selectedErrorType = ref<'request' | 'upstream'>('request')
 const showErrorModal = ref(false)
 
 const showErrorDetails = ref(false)
@@ -511,8 +514,9 @@ function onQueryModeChange(v: string | number | boolean | null) {
   queryMode.value = v as QueryMode
 }
 
-function openError(id: number) {
+function openError(id: number, kind: 'request' | 'upstream' = 'request') {
   selectedErrorId.value = id
+  selectedErrorType.value = kind
   // Stack the detail modal on top of the list modal it was opened from,
   // so closing it returns to the list instead of dismissing everything.
   showErrorModal.value = true
