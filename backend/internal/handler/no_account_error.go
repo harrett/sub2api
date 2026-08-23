@@ -91,10 +91,13 @@ func classifyNoAccountError(
 	return fallback
 }
 
-// classifyNoAccountErrorFromGin is a thin wrapper that forwards the gin
+// upstreamClassifyNoAccountErrorFromGin is a thin wrapper that forwards the gin
 // context's underlying request context. Most call sites already have a
 // *gin.Context handy, so this keeps the call sites uncluttered.
-func classifyNoAccountErrorFromGin(
+//
+// 对外入口 classifyNoAccountErrorFromGin 在 no_account_presentation.go 里包了
+// 一层，补上责任方标签与可操作指引；本函数体保持 upstream 原样。
+func upstreamClassifyNoAccountErrorFromGin(
 	c *gin.Context,
 	diag service.ModelAvailabilityDiagnoser,
 	apiKey *service.APIKey,

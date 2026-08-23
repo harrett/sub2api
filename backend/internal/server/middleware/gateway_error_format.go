@@ -250,6 +250,19 @@ var platformErrorGuidance = map[string]errorGuidance{
 		label: "服务器侧问题",
 		hint:  "计费服务暂时不可用，与你的账户余额和套餐额度无关。请稍后重试。",
 	},
+	// 账号调度失败（handler 层 classifyNoAccountError 的两个分支）。
+	// 原文案只有一句 "Service temporarily unavailable"，用户完全无法判断责任方，
+	// 很多人会误以为是自己额度用完而去充值。
+	"NO_AVAILABLE_ACCOUNTS": {
+		label: "服务器侧问题",
+		hint:  "当前分组的上游账号都处于限流冷却或额度暂停中，服务器已尝试全部可用账号。这与你的账户余额和套餐额度无关，请稍后重试；持续出现请联系管理员。",
+	},
+	// 模型在该分组无任何账号支持：属于服务端配置问题，重试永远不会成功，
+	// 因此保持 404 而不是 503，也不引导用户充值。
+	"MODEL_NOT_SUPPORTED_IN_GROUP": {
+		label: "服务器侧问题",
+		hint:  "该分组下没有账号配置支持这个模型，属于服务端配置问题，重试无法解决。请改用其他模型，或联系管理员为该分组补充支持该模型的账号。",
+	},
 	"API_KEY_AUTH_OVERLOADED": {
 		label: "服务器侧问题",
 		hint:  "鉴权服务暂时过载，与你的账户余额和套餐额度无关。请稍后重试。",
