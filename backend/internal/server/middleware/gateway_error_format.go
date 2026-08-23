@@ -52,6 +52,23 @@ const (
 // 不需要重新编译。
 var quotaErrorStatus = envStatusCode("SUB2API_QUOTA_ERROR_STATUS", http.StatusPaymentRequired)
 
+// rpmErrorStatus 是「每分钟请求数超限」返回给网关客户端的状态码。
+//
+// 默认保持 429，因为 RPM 与配额耗尽性质不同：窗口 60 秒内就重置，理论上
+// Retry-After + SDK 自动退避能让请求自愈，用户完全无感。
+//
+// 但实测 Codex CLI 的整条重试链只跨约 6 秒（间隔 1s/1s/2s/2s），只有恰好越过
+// 分钟边界时才会成功；其余情况它走专用的限流分支、直接丢弃响应体，只打印自己的
+// "exceeded retry limit, last status: 429 Too Many Requests" —— 用户看不到
+// 「你请求太快了」这个真实原因，反而会以为是服务端故障。
+//
+// 想让 RPM 的提示也能透出来，把它设成 400：非 429 的 4xx 客户端不会重试，
+// 会直接把响应体打出来。代价是放弃自动自愈，属于产品取舍，故不默认开启。
+//
+// 刻意不复用 quotaErrorStatus：402 Payment Required 用在限流上语义错误，
+// 会把「请求太快」误导成「需要充值」。
+var rpmErrorStatus = envStatusCode("SUB2API_RPM_ERROR_STATUS", http.StatusTooManyRequests)
+
 // 站点地址一律来自环境变量，不写死在文案里 —— 同一份镜像会部署到多个域名。
 // 两个都没配就不追加地址，文案本身依然完整可读。
 //
@@ -215,15 +232,17 @@ var platformErrorGuidance = map[string]errorGuidance{
 		hint:   "该 API Key 的 7 天限额已用完，这不是服务器故障。请等待窗口重置，或联系管理员调整限额。",
 		status: quotaErrorStatus,
 	},
-	// RPM 刻意保持 429：窗口 60 秒内就重置，Retry-After + SDK 自动退避能真正恢复，
-	// 换成不可重试的状态码反而让客户端直接失败。
+	// RPM 默认保持 429（窗口 60 秒内就重置，退避有机会真正恢复），
+	// 但可用 SUB2API_RPM_ERROR_STATUS 改成 400 让提示能透传，取舍见该变量注释。
 	"USER_RPM_EXCEEDED": {
-		label: "账户限流问题",
-		hint:  "你的请求频率超过了账号的每分钟上限，这不是服务器故障。请降低并发或稍等一分钟后重试。",
+		label:  "账户限流问题",
+		hint:   "你的请求频率超过了账号的每分钟上限，这不是服务器故障。请降低并发或稍等一分钟后重试。",
+		status: rpmErrorStatus,
 	},
 	"GROUP_RPM_EXCEEDED": {
-		label: "账户限流问题",
-		hint:  "你的请求频率超过了该分组的每分钟上限，这不是服务器故障。请降低并发或稍等一分钟后重试。",
+		label:  "账户限流问题",
+		hint:   "你的请求频率超过了该分组的每分钟上限，这不是服务器故障。请降低并发或稍等一分钟后重试。",
+		status: rpmErrorStatus,
 	},
 
 	// ── 服务器侧：用户做什么都没用，别让他去充值 ──────────────────

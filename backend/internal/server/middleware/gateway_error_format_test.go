@@ -133,6 +133,33 @@ func TestNoHardcodedSiteURLInGuidance(t *testing.T) {
 	}
 }
 
+func TestErrorStatusKnobsAreWiredIntoGuidance(t *testing.T) {
+	// 状态码开关在包初始化时求值并写进 guidance 表，之后改环境变量不会生效
+	// （进程启动时读取，与其它 SUB2API_* 变量一致）。这里锁定「开关确实接进了
+	// 对应条目」以及各自的默认值。
+	require.Equal(t, http.StatusTooManyRequests, rpmErrorStatus, "RPM 默认必须保持 429，改默认值是产品决策")
+	require.Equal(t, http.StatusPaymentRequired, quotaErrorStatus)
+
+	for _, code := range []string{"USER_RPM_EXCEEDED", "GROUP_RPM_EXCEEDED"} {
+		require.Equal(t, rpmErrorStatus, platformErrorGuidance[code].status, code)
+	}
+	for _, code := range []string{
+		"USAGE_LIMIT_EXCEEDED",
+		"API_KEY_QUOTA_EXHAUSTED",
+		"USER_PLATFORM_DAILY_QUOTA_EXHAUSTED",
+		"USER_PLATFORM_WEEKLY_QUOTA_EXHAUSTED",
+		"USER_PLATFORM_MONTHLY_QUOTA_EXHAUSTED",
+		"API_KEY_RATE_5H_EXCEEDED",
+		"API_KEY_RATE_1D_EXCEEDED",
+		"API_KEY_RATE_7D_EXCEEDED",
+	} {
+		require.Equal(t, quotaErrorStatus, platformErrorGuidance[code].status, code)
+	}
+
+	// 限流不是花钱能解决的，绝不能复用 402 让用户以为要充值。
+	require.NotEqual(t, http.StatusPaymentRequired, rpmErrorStatus)
+}
+
 func TestFirstNonEmpty(t *testing.T) {
 	require.Equal(t, "a", firstNonEmpty("a", "b"))
 	require.Equal(t, "b", firstNonEmpty("", "b"))
