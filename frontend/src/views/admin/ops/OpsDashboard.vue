@@ -119,6 +119,7 @@
           :platform="platform"
           :group-id="groupId"
           :error-type="errorDetailsType"
+          :resume-state="resumeListState"
           @update:show="showErrorDetails = $event"
           @openErrorDetail="openError($event, errorDetailsType)"
         />
@@ -127,7 +128,8 @@
           v-model:show="showErrorModal"
           :error-id="selectedErrorId"
           :error-type="selectedErrorType"
-          :z-index="60"
+          :back-to-list="detailReturnTarget !== null"
+          @back="handleBackToList"
         />
 
         <OpsRequestDetailsModal
@@ -136,6 +138,7 @@
           :preset="requestDetailsPreset"
           :platform="platform"
           :group-id="groupId"
+          :resume-state="resumeListState"
           @openErrorDetail="openError($event, 'request')"
         />
       </template>
@@ -385,6 +388,13 @@ const requestDetailsPreset = ref<OpsRequestDetailsPreset>({
   sort: 'created_at_desc'
 })
 
+// 记录单条错误详情来自哪个列表，便于"返回列表"时重新打开对应弹窗并保留状态。
+type DetailReturnTarget = 'errorList' | 'requestList' | null
+const detailReturnTarget = ref<DetailReturnTarget>(null)
+
+// 从详情返回时，列表弹窗应保留上一次的筛选/分页状态而非重置。
+const resumeListState = ref(false)
+
 const showSettingsDialog = ref(false)
 const showAlertRulesCard = ref(false)
 
@@ -517,9 +527,32 @@ function onQueryModeChange(v: string | number | boolean | null) {
 function openError(id: number, kind: 'request' | 'upstream' = 'request') {
   selectedErrorId.value = id
   selectedErrorType.value = kind
-  // Stack the detail modal on top of the list modal it was opened from,
-  // so closing it returns to the list instead of dismissing everything.
+  // 记录来源列表，便于详情页"返回列表"。
+  detailReturnTarget.value = showRequestDetails.value ? 'requestList' : showErrorDetails.value ? 'errorList' : null
+  // Ensure only one modal visible at a time.
+  showErrorDetails.value = false
+  showRequestDetails.value = false
   showErrorModal.value = true
+}
+
+// 从单条错误详情返回其来源列表，重新打开关联弹窗（保留筛选/分页状态）。
+function handleBackToList() {
+  const target = detailReturnTarget.value
+  resumeListState.value = true
+  if (target === 'requestList') {
+    showErrorModal.value = false
+    showErrorDetails.value = false
+    showRequestDetails.value = true
+  } else if (target === 'errorList') {
+    showErrorModal.value = false
+    showRequestDetails.value = false
+    showErrorDetails.value = true
+  }
+  detailReturnTarget.value = null
+  // 子组件 watch 在本次 show 变化中消费 resumeState 后复位，保证下次手动打开仍会重置筛选。
+  window.setTimeout(() => {
+    resumeListState.value = false
+  }, 0)
 }
 
 function buildApiParams() {
