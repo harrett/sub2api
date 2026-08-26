@@ -232,8 +232,16 @@ var platformErrorGuidance = map[string]errorGuidance{
 		hint:   "该 API Key 的 7 天限额已用完，这不是服务器故障。请等待窗口重置，或联系管理员调整限额。",
 		status: quotaErrorStatus,
 	},
-	// RPM 默认保持 429（窗口 60 秒内就重置，退避有机会真正恢复），
+	// RPM 与用户并发默认保持 429（窗口很短，退避有机会真正恢复），
 	// 但可用 SUB2API_RPM_ERROR_STATUS 改成 400 让提示能透传，取舍见该变量注释。
+	//
+	// 用户并发超限与 RPM 同属「用户侧短期限流」：都是用户自己发得太快，
+	// 都在秒级恢复，用户降速就能解决，故共用同一个状态码开关。
+	"USER_CONCURRENCY_EXCEEDED": {
+		label:  "账户限流问题",
+		hint:   "你同时发起的请求数超过了账号的并发上限，这不是服务器故障。请减少并发请求数，或等前面的请求完成后重试。",
+		status: rpmErrorStatus,
+	},
 	"USER_RPM_EXCEEDED": {
 		label:  "账户限流问题",
 		hint:   "你的请求频率超过了账号的每分钟上限，这不是服务器故障。请降低并发或稍等一分钟后重试。",
@@ -262,6 +270,21 @@ var platformErrorGuidance = map[string]errorGuidance{
 	"MODEL_NOT_SUPPORTED_IN_GROUP": {
 		label: "服务器侧问题",
 		hint:  "该分组下没有账号配置支持这个模型，属于服务端配置问题，重试无法解决。请改用其他模型，或联系管理员为该分组补充支持该模型的账号。",
+	},
+	// 并发槽位相关（handler 层 concurrencyErrorResponse）。注意这几条里
+	// USER_CONCURRENCY_EXCEEDED 是用户侧、其余都是服务器侧 —— 同一个函数产出的
+	// 错误分属两种责任方，必须按 slotType 区分，不能一刀切。
+	"ACCOUNT_CONCURRENCY_EXCEEDED": {
+		label: "服务器侧问题",
+		hint:  "上游账号的并发槽位已满，服务器正在等待空闲账号。这与你的账户余额和套餐额度无关，请稍后重试；持续出现请联系管理员。",
+	},
+	"WAIT_QUEUE_FULL": {
+		label: "服务器侧问题",
+		hint:  "服务器当前排队请求过多，等待队列已满。这与你的账户余额和套餐额度无关，请稍后重试；持续出现请联系管理员。",
+	},
+	"CONCURRENCY_SERVICE_UNAVAILABLE": {
+		label: "服务器侧问题",
+		hint:  "并发调度服务暂时不可用，与你的账户余额和套餐额度无关。请稍后重试或联系管理员。",
 	},
 	"API_KEY_AUTH_OVERLOADED": {
 		label: "服务器侧问题",

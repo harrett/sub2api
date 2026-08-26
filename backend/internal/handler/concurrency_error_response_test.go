@@ -57,7 +57,9 @@ func TestConcurrencyErrorResponse(t *testing.T) {
 			status, errType, message := concurrencyErrorResponse(tt.err, tt.slotType)
 			require.Equal(t, tt.wantStatus, status)
 			require.Equal(t, tt.wantType, errType)
-			require.Equal(t, tt.wantMessage, message)
+			// fork: 原始文案仍完整保留，后面追加了责任方标签与可操作指引
+			// （见 concurrency_error_presentation.go），故由相等改为包含。
+			require.Contains(t, message, tt.wantMessage)
 		})
 	}
 }
