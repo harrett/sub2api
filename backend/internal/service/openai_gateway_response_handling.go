@@ -1832,7 +1832,12 @@ func buildOpenAIResponseFailedSSE(responseID, model string, source []byte, fallb
 	return "event: response.failed\ndata: " + string(payload) + "\n\n"
 }
 
-func sanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string, clientOutputStarted bool) ([]byte, bool) {
+// upstreamSanitizeOpenAIResponseFailedEventForClient 是 upstream 的原始实现，
+// 函数体保持原样。对外入口 sanitizeOpenAIResponseFailedEventForClient 在
+// fork 本地的 openai_capacity_shed_presentation.go 里包了一层，命中容量降载
+// 时额外在 message 字段补一次责任方标签；本函数只负责 upstream 原有的错误码/
+// 类型改写，不碰 message。
+func upstreamSanitizeOpenAIResponseFailedEventForClient(payload []byte, eventType string, clientOutputStarted bool) ([]byte, bool) {
 	eventType = strings.TrimSpace(eventType)
 	isFailedEvent := eventType == "response.failed"
 	if (!isFailedEvent && eventType != "error") || len(payload) == 0 || !gjson.ValidBytes(payload) {
