@@ -1,8 +1,8 @@
 //go:build unit
 
-package middleware
+package gatewayerr
 
-// fork 本地测试，覆盖 gateway_error_format.go。
+// fork 本地测试，覆盖 gatewayerr.go。
 // 单独成文件是为了长期跟随 upstream rebase 时不与其测试文件产生冲突。
 
 import (
@@ -30,13 +30,13 @@ func TestGatewayErrorResponseKeepsInternalEnvelopeForPanel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	c := newGatewayErrorTestContext("/api/v1/user/profile", nil)
-	status, body := gatewayErrorResponse(c, http.StatusTooManyRequests, "USAGE_LIMIT_EXCEEDED", "daily usage limit exceeded")
+	status, body := GatewayErrorResponse(c, http.StatusTooManyRequests, "USAGE_LIMIT_EXCEEDED", "daily usage limit exceeded")
 
 	// 后台/面板必须保持内部信封，Vue 前端按 {"code","message"} 解析；
 	// 状态码也不能被重映射，否则前端的 429 分支会失效。
 	require.Equal(t, http.StatusTooManyRequests, status)
-	envelope, ok := body.(ErrorResponse)
-	require.True(t, ok, "panel routes must keep the internal ErrorResponse envelope")
+	envelope, ok := body.(InternalEnvelope)
+	require.True(t, ok, "panel routes must keep the internal InternalEnvelope")
 	require.Equal(t, "USAGE_LIMIT_EXCEEDED", envelope.Code)
 	require.Equal(t, "daily usage limit exceeded", envelope.Message)
 }
@@ -46,11 +46,11 @@ func TestGatewayErrorResponseSanitizesPanelMessages(t *testing.T) {
 
 	raw := `error: code=429 reason="DAILY_LIMIT_EXCEEDED" message="daily usage limit exceeded" metadata=map[]`
 	c := newGatewayErrorTestContext("/api/v1/user/profile", nil)
-	status, body := gatewayErrorResponse(c, http.StatusTooManyRequests, "USAGE_LIMIT_EXCEEDED", raw)
+	status, body := GatewayErrorResponse(c, http.StatusTooManyRequests, "USAGE_LIMIT_EXCEEDED", raw)
 
 	// 信封和状态码不变（前端契约），但内部字符串仍要清洗掉。
 	require.Equal(t, http.StatusTooManyRequests, status)
-	envelope, ok := body.(ErrorResponse)
+	envelope, ok := body.(InternalEnvelope)
 	require.True(t, ok)
 	require.Equal(t, "USAGE_LIMIT_EXCEEDED", envelope.Code)
 	require.Equal(t, "daily usage limit exceeded", envelope.Message)
@@ -69,7 +69,7 @@ func TestGatewayErrorResponseAppendsConfiguredPurchaseURL(t *testing.T) {
 	withSiteURLs(t, "https://example.test/purchase", "https://example.test/dashboard")
 
 	c := newGatewayErrorTestContext("/v1/responses", nil)
-	_, body := gatewayErrorResponse(c, http.StatusForbidden, "INSUFFICIENT_BALANCE", "Insufficient account balance")
+	_, body := GatewayErrorResponse(c, http.StatusForbidden, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 	encoded, err := json.Marshal(body)
 	require.NoError(t, err)
 
@@ -83,7 +83,7 @@ func TestGatewayErrorResponseFallsBackToConsoleURL(t *testing.T) {
 	withSiteURLs(t, "https://example.test/dashboard", "https://example.test/dashboard")
 
 	c := newGatewayErrorTestContext("/v1/responses", nil)
-	_, body := gatewayErrorResponse(c, http.StatusForbidden, "SUBSCRIPTION_EXPIRED", "subscription has expired")
+	_, body := GatewayErrorResponse(c, http.StatusForbidden, "SUBSCRIPTION_EXPIRED", "subscription has expired")
 	encoded, err := json.Marshal(body)
 	require.NoError(t, err)
 	require.Contains(t, string(encoded), "[访问 https://example.test/dashboard]")
@@ -94,7 +94,7 @@ func TestGatewayErrorResponseOmitsLinkWhenUnconfigured(t *testing.T) {
 	withSiteURLs(t, "", "")
 
 	c := newGatewayErrorTestContext("/v1/responses", nil)
-	_, body := gatewayErrorResponse(c, http.StatusForbidden, "INSUFFICIENT_BALANCE", "Insufficient account balance")
+	_, body := GatewayErrorResponse(c, http.StatusForbidden, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 	encoded, err := json.Marshal(body)
 	require.NoError(t, err)
 	var decoded struct {
@@ -117,7 +117,7 @@ func TestGatewayErrorResponseNeverLinksServerSideCauses(t *testing.T) {
 	// 服务器侧问题引导用户去充值是最糟的体验，必须无链接。
 	for _, code := range []string{"API_KEY_AUTH_OVERLOADED", "INTERNAL_ERROR", "SUBSCRIPTION_MAINTENANCE_FAILED"} {
 		c := newGatewayErrorTestContext("/v1/responses", nil)
-		_, body := gatewayErrorResponse(c, http.StatusServiceUnavailable, code, "boom")
+		_, body := GatewayErrorResponse(c, http.StatusServiceUnavailable, code, "boom")
 		encoded, err := json.Marshal(body)
 		require.NoError(t, err)
 		require.NotContains(t, string(encoded), "example.test", code)
@@ -180,7 +180,7 @@ func TestGatewayErrorResponseUnwrapsApplicationErrorAndLabelsQuota(t *testing.T)
 	// 这是 api_key_auth.go 传进来的真实字符串：validateErr.Error()。
 	raw := `error: code=429 reason="DAILY_LIMIT_EXCEEDED" message="daily usage limit exceeded" metadata=map[]`
 	c := newGatewayErrorTestContext("/v1/responses", nil)
-	status, body := gatewayErrorResponse(c, http.StatusTooManyRequests, "USAGE_LIMIT_EXCEEDED", raw)
+	status, body := GatewayErrorResponse(c, http.StatusTooManyRequests, "USAGE_LIMIT_EXCEEDED", raw)
 
 	require.Equal(t, http.StatusPaymentRequired, status, "quota errors must not stay on 429; clients auto-retry it")
 
@@ -209,7 +209,7 @@ func TestGatewayErrorResponseLabelsServerSideCauses(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	c := newGatewayErrorTestContext("/v1/responses", nil)
-	status, body := gatewayErrorResponse(c, http.StatusServiceUnavailable, "API_KEY_AUTH_OVERLOADED", "API key authentication is temporarily unavailable")
+	status, body := GatewayErrorResponse(c, http.StatusServiceUnavailable, "API_KEY_AUTH_OVERLOADED", "API key authentication is temporarily unavailable")
 
 	require.Equal(t, http.StatusServiceUnavailable, status)
 	encoded, err := json.Marshal(body)
@@ -270,7 +270,7 @@ func TestGatewayErrorResponseAnthropicAndGeminiShapes(t *testing.T) {
 
 	t.Run("anthropic", func(t *testing.T) {
 		c := newGatewayErrorTestContext("/v1/messages", nil)
-		_, body := gatewayErrorResponse(c, http.StatusForbidden, "INSUFFICIENT_BALANCE", "Insufficient account balance")
+		_, body := GatewayErrorResponse(c, http.StatusForbidden, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 		encoded, err := json.Marshal(body)
 		require.NoError(t, err)
 		var decoded struct {
@@ -288,7 +288,7 @@ func TestGatewayErrorResponseAnthropicAndGeminiShapes(t *testing.T) {
 
 	t.Run("gemini", func(t *testing.T) {
 		c := newGatewayErrorTestContext("/v1beta/models/gemini-3-pro:generateContent", nil)
-		_, body := gatewayErrorResponse(c, http.StatusForbidden, "INSUFFICIENT_BALANCE", "Insufficient account balance")
+		_, body := GatewayErrorResponse(c, http.StatusForbidden, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 		encoded, err := json.Marshal(body)
 		require.NoError(t, err)
 		var decoded struct {
@@ -309,7 +309,7 @@ func TestGatewayErrorResponseLeavesUnknownCodesAlone(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	c := newGatewayErrorTestContext("/v1/responses", nil)
-	status, body := gatewayErrorResponse(c, http.StatusBadRequest, "SOME_NEW_UPSTREAM_CODE", "something specific happened")
+	status, body := GatewayErrorResponse(c, http.StatusBadRequest, "SOME_NEW_UPSTREAM_CODE", "something specific happened")
 
 	require.Equal(t, http.StatusBadRequest, status)
 	encoded, err := json.Marshal(body)

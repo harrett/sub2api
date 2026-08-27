@@ -19,7 +19,8 @@ package handler
 //	等待队列满   → 服务器侧问题：容量不足
 //	兜底 503     → 服务器侧问题
 //
-// 责任方判定与另外三条链路共用 middleware 的 platformErrorGuidance 表，措辞统一。
+// 责任方判定与其它链路共用 internal/pkg/gatewayerr 的 platformErrorGuidance
+// 表，措辞统一。
 //
 // 包一层而不是改 upstream 函数体，是为了让 upstream 对映射逻辑的后续改动仍能
 // 干净合入 —— 那边只有函数名一行属于本 fork。
@@ -28,7 +29,7 @@ import (
 	"context"
 	"errors"
 
-	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/gatewayerr"
 )
 
 // 责任方指引的查表键。upstream 的返回值不带错误码，只能从 error 类型反推。
@@ -52,7 +53,7 @@ func concurrencyErrorResponse(err error, slotType string) (int, string, string) 
 		// 客户端已断开（499），补文案没有意义，也不该改状态码。
 		return status, errType, message
 	}
-	status, message = middleware2.PlatformErrorPresentation(code, status, message)
+	status, message = gatewayerr.PlatformErrorPresentation(code, status, message)
 	return status, errType, message
 }
 

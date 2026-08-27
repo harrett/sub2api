@@ -11,8 +11,8 @@ package handler
 // 集中进入冷却/额度暂停，池子里一个都选不出来，属于服务端容量问题；但不少用户会
 // 误以为是自己额度用完而去充值。
 //
-// 这里统一走 middleware.PlatformErrorPresentation，与 API Key 鉴权中间件、
-// 计费检查两条链路共用同一张 platformErrorGuidance 表，保证三处措辞一致。
+// 这里统一走 gatewayerr.PlatformErrorPresentation，与 API Key 鉴权中间件、
+// 计费检查等链路共用同一张 platformErrorGuidance 表，保证各处措辞一致。
 // 状态码不做重映射：503 可重试、404 是配置问题不可重试，upstream 的判断本就正确。
 //
 // 注意排障详情（调度器的 pool=/filtered: 摘要）不放进客户端响应 —— 那会泄露
@@ -25,7 +25,7 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/gatewayerr"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -33,6 +33,7 @@ import (
 const (
 	noAvailableAccountsGuidanceCode = "NO_AVAILABLE_ACCOUNTS"
 	modelNotSupportedGuidanceCode   = "MODEL_NOT_SUPPORTED_IN_GROUP"
+	allAccountsRateLimitedGuidance  = "ALL_ACCOUNTS_RATE_LIMITED"
 )
 
 // classifyNoAccountErrorFromGin 是全部调用点使用的入口，签名与 upstream 一致。
@@ -50,10 +51,35 @@ func classifyNoAccountErrorFromGin(
 	if classification.ModelNotFound {
 		code = modelNotSupportedGuidanceCode
 	}
-	classification.Status, classification.Message = middleware2.PlatformErrorPresentation(
+	classification.Status, classification.Message = gatewayerr.PlatformErrorPresentation(
 		code,
 		classification.Status,
 		classification.Message,
 	)
 	return classification
+}
+
+// classifySelectionFailureError 是全部调用点使用的入口，签名与 upstream 一致。
+//
+// 全部 4 个调用点都是先调用 classifyNoAccountErrorFromGin（上面已经打好标签），
+// 再用这个函数的返回值整体覆盖 cls —— upstream 命中"全部账号被限流"这个更精确
+// 的场景时，会用一条全新的、未经处理的 noAccountErrorClassification 直接替换
+// 掉已打标签的结果，导致标签被悄悄冲掉（用户看到裸的
+// "All available accounts are currently rate-limited. Please retry later."）。
+// 因此这里必须重新补一次，而不能指望调用方那次 classifyNoAccountErrorFromGin
+// 的标签能存活下来。
+//
+// 用结构体整体比较判断 upstream 是否真的命中替换：三个字段都是标量，可比较；
+// 未命中时原样返回 fallback（已经带标签），不会重复加工。
+func classifySelectionFailureError(err error, fallback noAccountErrorClassification) noAccountErrorClassification {
+	result := upstreamClassifySelectionFailureError(err, fallback)
+	if result == fallback {
+		return result
+	}
+	result.Status, result.Message = gatewayerr.PlatformErrorPresentation(
+		allAccountsRateLimitedGuidance,
+		result.Status,
+		result.Message,
+	)
+	return result
 }

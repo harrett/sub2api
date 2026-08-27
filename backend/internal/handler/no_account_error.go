@@ -36,9 +36,12 @@ type noAccountErrorClassification struct {
 
 var selectionModelRateLimitedPattern = regexp.MustCompile(`(?:model_rate_limited|rate_limited)=(\d+)`)
 
-// classifySelectionFailureError preserves the scheduler's compact reason when
-// every model-capable account is temporarily rate limited.
-func classifySelectionFailureError(err error, fallback noAccountErrorClassification) noAccountErrorClassification {
+// upstreamClassifySelectionFailureError preserves the scheduler's compact
+// reason when every model-capable account is temporarily rate limited.
+//
+// 对外入口 classifySelectionFailureError 在 no_account_presentation.go 里包了
+// 一层，命中时补上责任方标签；本函数体保持 upstream 原样。
+func upstreamClassifySelectionFailureError(err error, fallback noAccountErrorClassification) noAccountErrorClassification {
 	if err == nil {
 		return fallback
 	}

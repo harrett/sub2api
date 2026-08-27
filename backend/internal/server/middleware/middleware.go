@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/gatewayerr"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -75,17 +76,17 @@ func NewErrorResponse(code, message string) ErrorResponse {
 }
 
 // AbortWithError 中断请求并返回JSON错误。
-// 网关路径会按调用方协议改写错误体，详见 gateway_error_format.go；
+// 网关路径会按调用方协议改写错误体，详见 internal/pkg/gatewayerr；
 // 后台/面板路径保持内部信封不变。
 func AbortWithError(c *gin.Context, statusCode int, code, message string) {
-	status, body := gatewayErrorResponse(c, statusCode, code, message)
+	status, body := gatewayerr.GatewayErrorResponse(c, statusCode, code, message)
 	c.JSON(status, body)
 	c.Abort()
 }
 
 // abortWithOpenAIQuotaError writes the OpenAI-compatible insufficient quota response.
 func abortWithOpenAIQuotaError(c *gin.Context, statusCode int, message string) {
-	status, body := gatewayErrorResponse(c, statusCode, "API_KEY_QUOTA_EXHAUSTED", message)
+	status, body := gatewayerr.GatewayErrorResponse(c, statusCode, "API_KEY_QUOTA_EXHAUSTED", message)
 	c.JSON(status, body)
 	c.Abort()
 }

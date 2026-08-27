@@ -1,16 +1,13 @@
-package middleware
-
-// gateway_error_format.go — fork 本地文件（upstream 不存在）。
+// Package gatewayerr — fork 本地包（upstream 不存在）。
 //
-// 目的：平台自身产生的错误（额度、余额、订阅、凭证）此前一律以内部信封
+// 目的：平台自身产生的错误（额度、余额、订阅、凭证、限流）此前一律以内部信封
 // {"code","message"} 返回。OpenAI / Anthropic / Gemini 客户端都解析不了这个
 // 形状，只能退回自己的通用文案（例如 Codex CLI 的
 // "exceeded retry limit, last status: 429 Too Many Requests"），用户因此
-// 完全看不到真实原因。同时 AbortWithError 的调用方常常直接传
-// ApplicationError.Error()，把 `error: code=429 reason="…" metadata=map[]`
-// 这种内部字符串泄露给终端用户。
+// 完全看不到真实原因。同时调用方常常直接传 ApplicationError.Error()，把
+// `error: code=429 reason="…" metadata=map[]` 这种内部字符串泄露给终端用户。
 //
-// 本文件做三件事：
+// 本包做三件事：
 //  1. 按入站协议输出对应格式的错误体；
 //  2. 清洗 ApplicationError 的原始字符串，只保留 message；
 //  3. 给已知错误码补上「是你的账户问题还是服务器问题」的分类标签和可操作指引，
@@ -19,8 +16,24 @@ package middleware
 // 注意上游错误（真正来自 OpenAI/Anthropic 等的响应）不走这里，那条链路由
 // service.ErrorPassthroughService 的后台规则控制。
 //
-// 接入点只有 middleware.go 里 AbortWithError / abortWithOpenAIQuotaError 两处
-// 函数体，21 个调用点全部不改，以便长期跟随 upstream rebase 时把冲突面压到最小。
+// 为什么单独成包：这套指引表最初长在 internal/server/middleware 里（当时只有
+// API Key 鉴权中间件用得到），后来 internal/handler 的计费检查、账号调度、并发
+// 槽位三条链路，以及 internal/service 的流式转发都要复用同一份责任方判断。
+// middleware 已经导入 service，若指引表继续留在 middleware 包，service 反过来
+// 导入 middleware 会直接编译期成环。提到这个无依赖的叶子包，三边都能安全导入。
+//
+// 接入点：
+//   - internal/server/middleware/middleware.go 的 AbortWithError /
+//     abortWithOpenAIQuotaError 两处函数体
+//   - internal/handler/billing_error_presentation.go（计费/限流检查）
+//   - internal/handler/no_account_presentation.go（账号调度失败）
+//   - internal/handler/concurrency_error_presentation.go（并发槽位）
+//   - internal/service 里处理 OpenAI 原生流式转发容量降载事件的包装层
+//
+// 全部接入点都遵循同一个模式：upstream 函数体保持原样，只改函数名一行，
+// 实际的标签/指引逻辑放在 fork 独有的包装函数里，调用本包的
+// PlatformErrorPresentation。以便长期跟随 upstream rebase 时把冲突面压到最小。
+package gatewayerr
 
 import (
 	"net/http"
@@ -29,8 +42,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/gin-gonic/gin"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 )
 
 // gatewayDialect 表示调用方期望的错误体格式。
@@ -43,6 +57,14 @@ const (
 	dialectAnthropic
 	dialectGemini
 )
+
+// InternalEnvelope 是后台/面板路径使用的内部错误信封，与
+// middleware.ErrorResponse 字段和 JSON 标签完全一致（该类型定义在 middleware
+// 包，本包不能反向导入，故在这里保留一份功能等价的最小定义）。
+type InternalEnvelope struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
 
 // quotaErrorStatus 是「额度/余额耗尽」类错误返回给网关客户端的状态码。
 //
@@ -265,6 +287,13 @@ var platformErrorGuidance = map[string]errorGuidance{
 		label: "服务器侧问题",
 		hint:  "当前分组的上游账号都处于限流冷却或额度暂停中，服务器已尝试全部可用账号。这与你的账户余额和套餐额度无关，请稍后重试；持续出现请联系管理员。",
 	},
+	// 调度器能明确判断出"全部候选账号都被上游限流"这个更精确的原因时命中
+	// （相对于 NO_AVAILABLE_ACCOUNTS 那个更宽泛的兜底）。保持 429 不变：
+	// 上游限流通常几十秒到几分钟内解除，跟 RPM 一样短周期，不适合改成不可重试。
+	"ALL_ACCOUNTS_RATE_LIMITED": {
+		label: "服务器侧问题",
+		hint:  "当前分组下所有支持该模型的账号都被上游临时限流，服务器已尝试全部可用账号。这与你的账户余额和套餐额度无关，通常几十秒到几分钟内恢复，请稍后重试；持续出现请联系管理员。",
+	},
 	// 模型在该分组无任何账号支持：属于服务端配置问题，重试永远不会成功，
 	// 因此保持 404 而不是 503，也不引导用户充值。
 	"MODEL_NOT_SUPPORTED_IN_GROUP": {
@@ -298,17 +327,27 @@ var platformErrorGuidance = map[string]errorGuidance{
 		label: "服务器侧问题",
 		hint:  "订阅用量窗口维护失败，与你的账户余额和套餐额度无关。请联系管理员。",
 	},
+	// OpenAI 原生流式转发中途遇到上游容量降载（capacity shed）事件时命中：
+	// 客户端已经开始收到 token，无法再切账号重试，只能把上游的失败事件原样
+	// 转发。这是四条 handler/middleware 链路之外唯一一处"必须原样转发上游 SSE
+	// 字节、但仍要在 message 里补标签"的场景，详见
+	// internal/service 里对应的包装层。
+	"UPSTREAM_CAPACITY_SHED_MIDSTREAM": {
+		label: "服务器侧问题",
+		hint:  "上游服务当前容量紧张，暂时拒绝了这次生成请求。这与你的账户余额和套餐额度无关，请稍后重试。",
+	},
 }
 
-// PlatformErrorPresentation 让 handler 层复用这里的责任方标签、可操作指引与
-// 额度类状态码策略，保证「中间件拦截」和「计费检查拒绝」两条链路对用户的措辞
-// 完全一致。
+// PlatformErrorPresentation 让 handler / service 层复用这里的责任方标签、
+// 可操作指引与额度类状态码策略，保证「中间件拦截」「计费检查拒绝」「账号调度
+// 失败」「并发槽位」「流式转发容量降载」五条链路对用户的措辞完全一致。
 //
-// reason 取自 pkg/errors 的 Reason（如 USER_PLATFORM_MONTHLY_QUOTA_EXHAUSTED）。
-// 未登记的 reason 只清洗消息、不改状态码，因此对未知错误是安全的空操作。
+// reason 取自 pkg/errors 的 Reason（如 USER_PLATFORM_MONTHLY_QUOTA_EXHAUSTED）
+// 或调用方自定义的查表键（如 NO_AVAILABLE_ACCOUNTS）。未登记的 reason 只清洗
+// 消息、不改状态码，因此对未知错误是安全的空操作。
 //
-// 注意这里只负责「状态码 + 文案」；响应体的协议形状仍由各 handler 自己的
-// writer 决定，它们本来就已经按平台输出正确格式。
+// 注意这里只负责「状态码 + 文案」；响应体的协议形状仍由各调用方自己的 writer
+// 决定，它们本来就已经按平台输出正确格式。
 func PlatformErrorPresentation(reason string, statusCode int, message string) (int, string) {
 	guidance, ok := platformErrorGuidance[reason]
 	if !ok {
@@ -320,14 +359,14 @@ func PlatformErrorPresentation(reason string, statusCode int, message string) (i
 	return statusCode, clientFacingMessage(guidance, true, message)
 }
 
-// gatewayErrorResponse 把平台错误渲染成调用方能解析的形状。
+// GatewayErrorResponse 把平台错误渲染成调用方能解析的形状。
 // 返回最终状态码和响应体；内部路径（后台/面板）原样返回内部信封。
-func gatewayErrorResponse(c *gin.Context, statusCode int, code, message string) (int, any) {
+func GatewayErrorResponse(c *gin.Context, statusCode int, code, message string) (int, any) {
 	dialect := detectGatewayDialect(c)
 	if dialect == dialectInternal {
 		// 后台/面板保持内部信封和原状态码不变，但仍然清洗 ApplicationError 的
 		// 原始字符串 —— 运维错误日志和前端提示都不该出现 metadata=map[]。
-		return statusCode, NewErrorResponse(code, unwrapApplicationErrorMessage(message))
+		return statusCode, InternalEnvelope{Code: code, Message: unwrapApplicationErrorMessage(message)}
 	}
 
 	guidance, hasGuidance := platformErrorGuidance[code]

@@ -12,8 +12,8 @@ package handler
 // 打印自己的 "exceeded retry limit, last status: 429 Too Many Requests" 并
 // 丢掉响应体 —— 用户永远看不到「你的月配额用完了」。
 //
-// 这里统一走 middleware.PlatformErrorPresentation，与 API Key 鉴权中间件那条
-// 链路共用同一张 platformErrorGuidance 表，保证两处对用户的措辞一致：
+// 这里统一走 gatewayerr.PlatformErrorPresentation，与 API Key 鉴权中间件等
+// 其它链路共用同一张 platformErrorGuidance 表，保证各处对用户的措辞一致：
 // 长周期配额改用不可重试的状态码并附上购买链接，RPM 保持 429。
 //
 // 包成一层而不是改 upstreamBillingErrorDetails 的函数体，是为了让 upstream 对
@@ -21,12 +21,12 @@ package handler
 
 import (
 	pkgerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/gatewayerr"
 )
 
 // billingErrorDetails 是全部 19 个调用点使用的入口，签名与 upstream 保持一致。
 func billingErrorDetails(err error) (status int, code, message string, retryAfter int) {
 	status, code, message, retryAfter = upstreamBillingErrorDetails(err)
-	status, message = middleware2.PlatformErrorPresentation(pkgerrors.Reason(err), status, message)
+	status, message = gatewayerr.PlatformErrorPresentation(pkgerrors.Reason(err), status, message)
 	return status, code, message, retryAfter
 }
