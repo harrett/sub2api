@@ -62,7 +62,7 @@ const (
 	defaultContentModerationTimeoutMS = 3000
 	maxContentModerationTimeoutMS     = 30000
 	maxModerationInputRunes           = 12000
-	maxModerationExcerptRunes         = 240
+	maxModerationExcerptRunes         = 4000
 
 	defaultContentModerationWorkerCount          = 4
 	maxContentModerationWorkerCount              = 32
