@@ -23,6 +23,9 @@ package handler
 // 干净合入 —— 那边只有函数名一行属于本 fork。
 
 import (
+	"net/http"
+	"regexp"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/gatewayerr"
@@ -31,10 +34,25 @@ import (
 
 // 责任方指引的查表键。upstream 的分类结果不带错误码，只能由 ModelNotFound 反推。
 const (
-	noAvailableAccountsGuidanceCode = "NO_AVAILABLE_ACCOUNTS"
-	modelNotSupportedGuidanceCode   = "MODEL_NOT_SUPPORTED_IN_GROUP"
-	allAccountsRateLimitedGuidance  = "ALL_ACCOUNTS_RATE_LIMITED"
+	noAvailableAccountsGuidanceCode  = "NO_AVAILABLE_ACCOUNTS"
+	modelNotSupportedGuidanceCode    = "MODEL_NOT_SUPPORTED_IN_GROUP"
+	allAccountsRateLimitedGuidance   = "ALL_ACCOUNTS_RATE_LIMITED"
+	modelBlockedByChannelPolicyGuide = "MODEL_BLOCKED_BY_CHANNEL_POLICY"
 )
+
+// channelPricingRestrictionPattern 匹配 checkChannelPricingRestriction 命中时
+// 调度器在候选循环之前就短路返回的错误（openai_account_scheduler.go /
+// openai_gateway_scheduling.go / gateway_scheduling.go 各有一处）：
+//
+//	no available accounts supporting model: gpt-5.6-sol (channel pricing restriction)
+//
+// 这条比 classifyNoAccountError 的兜底诊断更精确 —— 兜底诊断
+// （DiagnoseModelAvailabilityForPlatform）只查账号级 model_mapping，压根不知道
+// 渠道「限制模型」这回事，所以管理员通过渠道定价表主动禁用某个模型时，兜底诊断
+// 会误判成 "账号池暂时不可用"，结果是一句 "请稍后重试"——但这是管理员故意的策略
+// 封禁，重试永远不会成功。这里从错误串里识别出这个特定原因，单独给一条不建议
+// 重试的指引，不再走"稍后重试"的通用兜底文案。
+var channelPricingRestrictionPattern = regexp.MustCompile(`\(channel pricing restriction\)`)
 
 // classifyNoAccountErrorFromGin 是全部调用点使用的入口，签名与 upstream 一致。
 func classifyNoAccountErrorFromGin(
@@ -71,7 +89,22 @@ func classifyNoAccountErrorFromGin(
 //
 // 用结构体整体比较判断 upstream 是否真的命中替换：三个字段都是标量，可比较；
 // 未命中时原样返回 fallback（已经带标签），不会重复加工。
+//
+// 渠道限制命中的判断放在最前面、独立于 upstream 的正则分类之外 —— 这条错误
+// 携带的信息比 upstream 能识别的任何模式都更确定（scheduler 是在候选循环之前
+// 就短路返回的，不是"试了但都不满足条件"），不需要经过 upstream 的分类器，
+// 直接构造一个全新的、不可重试的 404 分类。
 func classifySelectionFailureError(err error, fallback noAccountErrorClassification) noAccountErrorClassification {
+	if err != nil && channelPricingRestrictionPattern.MatchString(err.Error()) {
+		status, message := gatewayerr.PlatformErrorPresentation(modelBlockedByChannelPolicyGuide, http.StatusNotFound, "")
+		return noAccountErrorClassification{
+			Status:        status,
+			ErrType:       "model_not_found",
+			Message:       message,
+			ModelNotFound: true,
+		}
+	}
+
 	result := upstreamClassifySelectionFailureError(err, fallback)
 	if result == fallback {
 		return result

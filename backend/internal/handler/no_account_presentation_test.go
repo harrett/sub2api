@@ -114,6 +114,28 @@ func TestClassifySelectionFailureErrorLabelsRateLimitedOverride(t *testing.T) {
 	require.NotContains(t, cls.Message, "升级套餐")
 }
 
+func TestClassifySelectionFailureErrorLabelsChannelPolicyBlockAsNonRetryable404(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// 线上实际抓到的调度器快路径错误：checkChannelPricingRestriction 命中时
+	// 在候选循环之前就短路返回，excluded_account_count=0。这不是"暂时没账号"，
+	// 是管理员在渠道定价表里主动排除了这个模型，重试永远不会成功 —— 必须是 404
+	// 而不是暗示"稍后重试"的兜底 503。
+	c := newNoAccountTestContext()
+	fallback := classifyNoAccountErrorFromGin(c, nil, nil, "gpt-5.6-sol", "gpt-5.6-sol", service.PlatformOpenAI)
+	require.Equal(t, http.StatusServiceUnavailable, fallback.Status, "前置条件：兜底分支默认是可重试的 503")
+
+	err := errors.New("no available accounts supporting model: gpt-5.6-sol (channel pricing restriction)")
+	cls := classifySelectionFailureError(err, fallback)
+
+	require.Equal(t, http.StatusNotFound, cls.Status, "策略封禁不可重试，不能停在 503")
+	require.Equal(t, "model_not_found", cls.ErrType)
+	require.True(t, cls.ModelNotFound, "调用方靠这个标记跳过 capacity-limited 运维指标")
+	require.Contains(t, cls.Message, "服务器侧问题")
+	require.Contains(t, cls.Message, "主动的策略限制")
+	require.NotContains(t, cls.Message, "请稍后重试", "策略封禁不该暗示重试有用")
+}
+
 func TestClassifySelectionFailureErrorPassesThroughUnmatched(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
