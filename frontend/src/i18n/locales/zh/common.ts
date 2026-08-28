@@ -168,6 +168,7 @@ export default {
     affiliateInviteRecords: '邀请记录',
     affiliateRebateRecords: '返利记录',
     affiliateTransferRecords: '提取记录',
+    affiliateStats: '邀请统计',
     profile: '个人资料',
     users: '用户管理',
     groups: '分组管理',

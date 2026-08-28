@@ -447,6 +447,18 @@ func (r *oauthEmailAffiliateRepoStub) GetAffiliateUserOverview(context.Context, 
 	panic("unexpected GetAffiliateUserOverview call")
 }
 
+func (r *oauthEmailAffiliateRepoStub) GetAffiliateLeaderboard(context.Context, service.AffiliateLeaderboardFilter) ([]service.AffiliateLeaderboardEntry, int64, error) {
+	panic("unexpected GetAffiliateLeaderboard call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) GetAffiliateInviteTimeline(context.Context, service.AffiliateInviteTimelineFilter) ([]service.AffiliateInviteTimelinePoint, error) {
+	panic("unexpected GetAffiliateInviteTimeline call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) GetAffiliateTopHalfInviters(context.Context, service.AffiliateTopHalfFilter) (*service.AffiliateTopHalfSummary, error) {
+	panic("unexpected GetAffiliateTopHalfInviters call")
+}
+
 func findSetCookieValue(cookies []*http.Cookie, name string) string {
 	for _, cookie := range cookies {
 		if cookie != nil && strings.EqualFold(cookie.Name, name) && cookie.MaxAge >= 0 {

@@ -240,6 +240,87 @@ func (h *AffiliateHandler) ListTransferRecords(c *gin.Context) {
 	response.Paginated(c, items, total, filter.Page, filter.PageSize)
 }
 
+// GetLeaderboard returns inviters ranked by invite count or accrued rebate.
+// GET /api/v1/admin/affiliates/stats/leaderboard
+func (h *AffiliateHandler) GetLeaderboard(c *gin.Context) {
+	page, pageSize := response.ParsePagination(c)
+	userTZ := c.Query("timezone")
+	filter := service.AffiliateLeaderboardFilter{
+		SortBy:   c.Query("sort_by"),
+		Page:     page,
+		PageSize: pageSize,
+	}
+	filter.StartAt = parseAffiliateRecordStartTime(c.Query("start_at"), userTZ)
+	filter.EndAt = parseAffiliateRecordEndTime(c.Query("end_at"), userTZ)
+
+	items, total, err := h.affiliateService.AdminGetAffiliateLeaderboard(c.Request.Context(), filter)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Paginated(c, items, total, page, pageSize)
+}
+
+// GetInviteTimeline returns invite counts bucketed by day/week/month, for the
+// whole site or a single inviter.
+// GET /api/v1/admin/affiliates/stats/timeline
+func (h *AffiliateHandler) GetInviteTimeline(c *gin.Context) {
+	userTZ := c.Query("timezone")
+	filter := service.AffiliateInviteTimelineFilter{
+		Granularity: c.Query("granularity"),
+	}
+	filter.StartAt = parseAffiliateRecordStartTime(c.Query("start_at"), userTZ)
+	filter.EndAt = parseAffiliateRecordEndTime(c.Query("end_at"), userTZ)
+	if raw := strings.TrimSpace(c.Query("inviter_id")); raw != "" {
+		inviterID, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || inviterID <= 0 {
+			response.BadRequest(c, "Invalid inviter_id")
+			return
+		}
+		filter.InviterID = &inviterID
+	}
+
+	points, err := h.affiliateService.AdminGetAffiliateInviteTimeline(c.Request.Context(), filter)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, points)
+}
+
+// GetTopHalfInviters returns inviters ranked in the top 50% by headcount
+// (sorted by invite count descending, top ceil(N/2)) within a date range,
+// plus aggregate stats on how much of the total invite volume they account for.
+// GET /api/v1/admin/affiliates/stats/top-half
+func (h *AffiliateHandler) GetTopHalfInviters(c *gin.Context) {
+	userTZ := c.Query("timezone")
+	filter := service.AffiliateTopHalfFilter{}
+	filter.StartAt = parseAffiliateRecordStartTime(c.Query("start_at"), userTZ)
+	filter.EndAt = parseAffiliateRecordEndTime(c.Query("end_at"), userTZ)
+	if mode := strings.TrimSpace(c.Query("mode")); mode != "" {
+		if mode != service.AffiliateTopHalfModeHeadcount && mode != service.AffiliateTopHalfModeVolume {
+			response.BadRequest(c, "Invalid mode")
+			return
+		}
+		filter.Mode = mode
+	}
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		limit, err := strconv.Atoi(raw)
+		if err != nil || limit <= 0 {
+			response.BadRequest(c, "Invalid limit")
+			return
+		}
+		filter.Limit = limit
+	}
+
+	summary, err := h.affiliateService.AdminGetAffiliateTopHalfInviters(c.Request.Context(), filter)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, summary)
+}
+
 func parseAffiliateRecordFilter(c *gin.Context, page, pageSize int) service.AffiliateRecordFilter {
 	filter := service.AffiliateRecordFilter{
 		Search:   c.Query("search"),

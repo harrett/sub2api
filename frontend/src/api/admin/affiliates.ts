@@ -77,6 +77,69 @@ export interface AffiliateTransferRecord {
   created_at: string
 }
 
+export interface ListAffiliateLeaderboardParams {
+  page?: number
+  page_size?: number
+  start_at?: string
+  end_at?: string
+  sort_by?: 'invite_count' | 'rebate_amount'
+  timezone?: string
+}
+
+export interface AffiliateLeaderboardEntry {
+  inviter_id: number
+  inviter_email: string
+  inviter_username: string
+  aff_code: string
+  invite_count: number
+  total_rebate: number
+  last_invited_at?: string | null
+}
+
+export interface GetAffiliateInviteTimelineParams {
+  inviter_id?: number
+  start_at?: string
+  end_at?: string
+  granularity?: 'day' | 'week' | 'month'
+  timezone?: string
+}
+
+export interface AffiliateInviteTimelinePoint {
+  bucket: string
+  invite_count: number
+}
+
+export type AffiliateTopHalfMode = 'headcount' | 'volume'
+
+export interface GetAffiliateTopHalfParams {
+  start_at?: string
+  end_at?: string
+  mode?: AffiliateTopHalfMode
+  limit?: number
+  timezone?: string
+}
+
+export interface AffiliateTopHalfInviter {
+  rank: number
+  inviter_id: number
+  inviter_email: string
+  inviter_username: string
+  aff_code: string
+  invite_count: number
+  total_rebate: number
+  last_invited_at?: string | null
+}
+
+export interface AffiliateTopHalfSummary {
+  mode: AffiliateTopHalfMode
+  total_inviter_count: number
+  top_half_count: number
+  total_invite_count: number
+  top_half_invite_count: number
+  top_half_invite_percent: number
+  items: AffiliateTopHalfInviter[]
+}
+
 export interface AffiliateUserOverview {
   user_id: number
   email: string
@@ -206,6 +269,61 @@ export async function listTransferRecords(
   return data
 }
 
+export async function getLeaderboard(
+  params: ListAffiliateLeaderboardParams = {},
+): Promise<PaginatedResponse<AffiliateLeaderboardEntry>> {
+  const { data } = await apiClient.get<PaginatedResponse<AffiliateLeaderboardEntry>>(
+    '/admin/affiliates/stats/leaderboard',
+    {
+      params: {
+        page: params.page ?? 1,
+        page_size: params.page_size ?? 20,
+        start_at: params.start_at || undefined,
+        end_at: params.end_at || undefined,
+        sort_by: params.sort_by || undefined,
+        timezone: params.timezone || undefined,
+      },
+    },
+  )
+  return data
+}
+
+export async function getInviteTimeline(
+  params: GetAffiliateInviteTimelineParams = {},
+): Promise<AffiliateInviteTimelinePoint[]> {
+  const { data } = await apiClient.get<AffiliateInviteTimelinePoint[]>(
+    '/admin/affiliates/stats/timeline',
+    {
+      params: {
+        inviter_id: params.inviter_id || undefined,
+        start_at: params.start_at || undefined,
+        end_at: params.end_at || undefined,
+        granularity: params.granularity || undefined,
+        timezone: params.timezone || undefined,
+      },
+    },
+  )
+  return data
+}
+
+export async function getTopHalfInviters(
+  params: GetAffiliateTopHalfParams = {},
+): Promise<AffiliateTopHalfSummary> {
+  const { data } = await apiClient.get<AffiliateTopHalfSummary>(
+    '/admin/affiliates/stats/top-half',
+    {
+      params: {
+        start_at: params.start_at || undefined,
+        end_at: params.end_at || undefined,
+        mode: params.mode || undefined,
+        limit: params.limit || undefined,
+        timezone: params.timezone || undefined,
+      },
+    },
+  )
+  return data
+}
+
 export async function getUserOverview(
   userId: number,
 ): Promise<AffiliateUserOverview> {
@@ -224,6 +342,9 @@ export const affiliatesAPI = {
   listInviteRecords,
   listRebateRecords,
   listTransferRecords,
+  getLeaderboard,
+  getInviteTimeline,
+  getTopHalfInviters,
   getUserOverview,
 }
 

@@ -392,8 +392,32 @@ export default {
       invitesDescription: '查看全站邀请关系和被邀请用户累计返利',
       rebatesDescription: '查看每一笔产生返利的充值订单',
       transfersDescription: '查看返利额度转入账户余额的提取流水',
+      statsDescription: '查看邀请人排行榜和拉新时间分布',
       errors: {
         loadFailed: '加载邀请返利记录失败'
+      },
+      stats: {
+        leaderboardTitle: '邀请人排行榜',
+        timelineTitle: '拉新时间分布',
+        inviteCount: '邀请数量',
+        lastInvitedAt: '最近邀请时间',
+        userPlaceholder: '搜索邮箱或用户名，默认统计全站',
+        changeUser: '更换用户',
+        granularityDay: '按天',
+        granularityWeek: '按周',
+        granularityMonth: '按月',
+        noData: '暂无数据',
+        topHalfTitle: '头部50%邀请人',
+        totalInviterCount: '邀请人总数',
+        topHalfCount: '前50%人数',
+        topHalfCountVolume: '达标所需人数',
+        totalInviteCount: '总邀请量',
+        topHalfInvitePercent: '前50%贡献占比',
+        bottomHalf: '其余邀请人',
+        modeHeadcount: '按人数',
+        modeVolume: '按邀请量',
+        modeHeadcountHint: '按邀请数排序取前一半邀请人（人数取半）',
+        modeVolumeHint: '按邀请数从高到低累加，取贡献了一半总邀请量所需的最少人数（帕累托口径）'
       },
       records: {
         search: '搜索',

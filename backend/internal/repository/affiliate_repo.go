@@ -672,6 +672,272 @@ func (r *affiliateRepository) GetAffiliateUserOverview(ctx context.Context, user
 	return &overview, rows.Err()
 }
 
+// GetAffiliateLeaderboard 按邀请数量或累计返利对邀请人排行。
+//
+// 用 LATERAL 子查询先按（邀请人,被邀请人）汇总返利再在外层按邀请人 GROUP BY 求和，
+// 避免直接 JOIN ledger 导致同一被邀请人多笔返利记录使 COUNT(*) 重复计数。
+func (r *affiliateRepository) GetAffiliateLeaderboard(ctx context.Context, filter service.AffiliateLeaderboardFilter) ([]service.AffiliateLeaderboardEntry, int64, error) {
+	client := clientFromContext(ctx, r.client)
+
+	clauses := []string{"ua.inviter_id IS NOT NULL"}
+	args := make([]any, 0, 2)
+	if filter.StartAt != nil {
+		args = append(args, *filter.StartAt)
+		clauses = append(clauses, fmt.Sprintf("ua.created_at >= $%d", len(args)))
+	}
+	if filter.EndAt != nil {
+		args = append(args, *filter.EndAt)
+		clauses = append(clauses, fmt.Sprintf("ua.created_at <= $%d", len(args)))
+	}
+	where := "WHERE " + strings.Join(clauses, " AND ")
+
+	total, err := scanInt64(ctx, client, `
+SELECT COUNT(DISTINCT ua.inviter_id)
+FROM user_affiliates ua
+`+where, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count affiliate leaderboard: %w", err)
+	}
+
+	orderColumn := "invite_count"
+	if filter.SortBy == "rebate_amount" {
+		orderColumn = "total_rebate"
+	}
+	args = append(args, filter.PageSize, (filter.Page-1)*filter.PageSize)
+	rows, err := client.QueryContext(ctx, `
+SELECT ua.inviter_id,
+       COALESCE(inviter.email, ''),
+       COALESCE(inviter.username, ''),
+       COALESCE(inviter_aff.aff_code, ''),
+       COUNT(*)::integer AS invite_count,
+       COALESCE(SUM(invitee_rebate.total), 0)::double precision AS total_rebate,
+       MAX(ua.created_at) AS last_invited_at
+FROM user_affiliates ua
+JOIN users inviter ON inviter.id = ua.inviter_id
+JOIN user_affiliates inviter_aff ON inviter_aff.user_id = ua.inviter_id
+LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(amount), 0)::double precision AS total
+    FROM user_affiliate_ledger ual
+    WHERE ual.user_id = ua.inviter_id AND ual.source_user_id = ua.user_id AND ual.action = 'accrue'
+) invitee_rebate ON true
+`+where+`
+GROUP BY ua.inviter_id, inviter.email, inviter.username, inviter_aff.aff_code
+ORDER BY `+orderColumn+` DESC
+LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query affiliate leaderboard: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	items := make([]service.AffiliateLeaderboardEntry, 0)
+	for rows.Next() {
+		var item service.AffiliateLeaderboardEntry
+		var lastInvitedAt sql.NullTime
+		if err := rows.Scan(
+			&item.InviterID,
+			&item.InviterEmail,
+			&item.InviterUsername,
+			&item.AffCode,
+			&item.InviteCount,
+			&item.TotalRebate,
+			&lastInvitedAt,
+		); err != nil {
+			return nil, 0, err
+		}
+		if lastInvitedAt.Valid {
+			t := lastInvitedAt.Time
+			item.LastInvitedAt = &t
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// GetAffiliateInviteTimeline 返回全站（InviterID 为 nil）或指定邀请人的拉新时间分布。
+func (r *affiliateRepository) GetAffiliateInviteTimeline(ctx context.Context, filter service.AffiliateInviteTimelineFilter) ([]service.AffiliateInviteTimelinePoint, error) {
+	client := clientFromContext(ctx, r.client)
+
+	clauses := []string{"ua.inviter_id IS NOT NULL"}
+	args := make([]any, 0, 4)
+	args = append(args, filter.Granularity)
+	if filter.InviterID != nil {
+		args = append(args, *filter.InviterID)
+		clauses = append(clauses, fmt.Sprintf("ua.inviter_id = $%d", len(args)))
+	}
+	if filter.StartAt != nil {
+		args = append(args, *filter.StartAt)
+		clauses = append(clauses, fmt.Sprintf("ua.created_at >= $%d", len(args)))
+	}
+	if filter.EndAt != nil {
+		args = append(args, *filter.EndAt)
+		clauses = append(clauses, fmt.Sprintf("ua.created_at <= $%d", len(args)))
+	}
+	where := "WHERE " + strings.Join(clauses, " AND ")
+
+	rows, err := client.QueryContext(ctx, `
+SELECT date_trunc($1, ua.created_at) AS bucket,
+       COUNT(*)::integer AS invite_count
+FROM user_affiliates ua
+`+where+`
+GROUP BY bucket
+ORDER BY bucket ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query affiliate invite timeline: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	points := make([]service.AffiliateInviteTimelinePoint, 0)
+	for rows.Next() {
+		var point service.AffiliateInviteTimelinePoint
+		if err := rows.Scan(&point.Bucket, &point.InviteCount); err != nil {
+			return nil, err
+		}
+		points = append(points, point)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return points, nil
+}
+
+// affiliateTopHalfPerInviterCTE 按邀请人聚合邀请数/返利，供 GetAffiliateTopHalfInviters
+// 的汇总与列表两条查询共用。LATERAL 子查询写法与 GetAffiliateLeaderboard 一致，避免
+// 返利求和的行放大。
+const affiliateTopHalfPerInviterCTE = `
+WITH per_inviter AS (
+    SELECT ua.inviter_id,
+           COALESCE(inviter.email, '') AS inviter_email,
+           COALESCE(inviter.username, '') AS inviter_username,
+           COALESCE(inviter_aff.aff_code, '') AS aff_code,
+           COUNT(*)::integer AS invite_count,
+           COALESCE(SUM(invitee_rebate.total), 0)::double precision AS total_rebate,
+           MAX(ua.created_at) AS last_invited_at
+    FROM user_affiliates ua
+    JOIN users inviter ON inviter.id = ua.inviter_id
+    JOIN user_affiliates inviter_aff ON inviter_aff.user_id = ua.inviter_id
+    LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(amount), 0)::double precision AS total
+        FROM user_affiliate_ledger ual
+        WHERE ual.user_id = ua.inviter_id AND ual.source_user_id = ua.user_id AND ual.action = 'accrue'
+    ) invitee_rebate ON true
+    %s
+    GROUP BY ua.inviter_id, inviter.email, inviter.username, inviter_aff.aff_code
+),
+ranked AS (
+    SELECT per_inviter.*,
+           ROW_NUMBER() OVER (ORDER BY invite_count DESC, inviter_id ASC) AS rnk,
+           COUNT(*) OVER ()::integer AS total_inviters,
+           SUM(invite_count) OVER ()::integer AS total_invites,
+           SUM(invite_count) OVER (
+               ORDER BY invite_count DESC, inviter_id ASC
+               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+           )::integer AS cum_invites
+    FROM per_inviter
+)
+`
+
+// affiliateTopHalfCond 按口径返回筛选头部集合的 SQL 条件表达式。
+//   - headcount：排名前 ceil(总人数/2)。
+//   - volume：按 invite_count 降序累加，取累计邀请量达到 ceil(总邀请量/2) 所需的最少人数
+//     （帕累托口径，"该行累加前的累计量" 小于阈值即说明该行是达到阈值所必需的）。
+func affiliateTopHalfCond(mode string) string {
+	if mode == service.AffiliateTopHalfModeVolume {
+		return "(cum_invites - invite_count) < CEIL(total_invites / 2.0)"
+	}
+	return "rnk <= CEIL(total_inviters / 2.0)"
+}
+
+// GetAffiliateTopHalfInviters 返回指定日期范围内按 filter.Mode 口径圈定的头部邀请人。
+//
+// 汇总统计（TotalInviterCount/TopHalfInviteCount 等）与展示列表分两条查询：汇总查询
+// 对完整队列聚合，不受 Limit 影响；列表查询按 rnk 截取并应用 Limit。两条查询共享
+// affiliateTopHalfPerInviterCTE，避免响应体随邀请人基数线性增长的同时保证汇总数字准确。
+func (r *affiliateRepository) GetAffiliateTopHalfInviters(ctx context.Context, filter service.AffiliateTopHalfFilter) (*service.AffiliateTopHalfSummary, error) {
+	client := clientFromContext(ctx, r.client)
+
+	clauses := []string{"ua.inviter_id IS NOT NULL"}
+	args := make([]any, 0, 2)
+	if filter.StartAt != nil {
+		args = append(args, *filter.StartAt)
+		clauses = append(clauses, fmt.Sprintf("ua.created_at >= $%d", len(args)))
+	}
+	if filter.EndAt != nil {
+		args = append(args, *filter.EndAt)
+		clauses = append(clauses, fmt.Sprintf("ua.created_at <= $%d", len(args)))
+	}
+	where := "WHERE " + strings.Join(clauses, " AND ")
+	cte := fmt.Sprintf(affiliateTopHalfPerInviterCTE, where)
+	cond := affiliateTopHalfCond(filter.Mode)
+
+	summary := &service.AffiliateTopHalfSummary{Mode: filter.Mode, Items: make([]service.AffiliateTopHalfInviter, 0)}
+
+	summaryRows, err := client.QueryContext(ctx, cte+`
+SELECT COALESCE(MAX(total_inviters), 0),
+       COALESCE(SUM(invite_count), 0)::integer AS total_invites,
+       COALESCE(SUM(invite_count) FILTER (WHERE `+cond+`), 0)::integer AS top_half_invites,
+       COALESCE(COUNT(*) FILTER (WHERE `+cond+`), 0)::integer AS top_half_count
+FROM ranked`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query affiliate top-half summary: %w", err)
+	}
+	if summaryRows.Next() {
+		if err := summaryRows.Scan(&summary.TotalInviterCount, &summary.TotalInviteCount, &summary.TopHalfInviteCount, &summary.TopHalfCount); err != nil {
+			_ = summaryRows.Close()
+			return nil, err
+		}
+	}
+	if err := summaryRows.Close(); err != nil {
+		return nil, err
+	}
+	if summary.TotalInviteCount > 0 {
+		summary.TopHalfInvitePercent = float64(summary.TopHalfInviteCount) / float64(summary.TotalInviteCount) * 100
+	}
+	if summary.TopHalfCount == 0 {
+		return summary, nil
+	}
+
+	listArgs := append(append([]any{}, args...), filter.Limit)
+	rows, err := client.QueryContext(ctx, cte+`
+SELECT inviter_id, inviter_email, inviter_username, aff_code, invite_count, total_rebate, last_invited_at, rnk
+FROM ranked
+WHERE `+cond+`
+ORDER BY rnk ASC
+LIMIT $`+fmt.Sprint(len(listArgs)), listArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("query affiliate top-half list: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var item service.AffiliateTopHalfInviter
+		var lastInvitedAt sql.NullTime
+		if err := rows.Scan(
+			&item.InviterID,
+			&item.InviterEmail,
+			&item.InviterUsername,
+			&item.AffCode,
+			&item.InviteCount,
+			&item.TotalRebate,
+			&lastInvitedAt,
+			&item.Rank,
+		); err != nil {
+			return nil, err
+		}
+		if lastInvitedAt.Valid {
+			t := lastInvitedAt.Time
+			item.LastInvitedAt = &t
+		}
+		summary.Items = append(summary.Items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return summary, nil
+}
+
 func buildAffiliateRecordWhere(filter service.AffiliateRecordFilter, timeColumn string, searchColumns []string) (string, []any) {
 	clauses := make([]string, 0, 3)
 	args := make([]any, 0, 3)

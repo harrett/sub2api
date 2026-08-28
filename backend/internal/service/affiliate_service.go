@@ -114,6 +114,11 @@ type AffiliateRepository interface {
 	ListAffiliateRebateRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateRebateRecord, int64, error)
 	ListAffiliateTransferRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateTransferRecord, int64, error)
 	GetAffiliateUserOverview(ctx context.Context, userID int64) (*AffiliateUserOverview, error)
+
+	// 管理端：统计（排行榜 + 邀请时间分布 + 头部50%邀请人）
+	GetAffiliateLeaderboard(ctx context.Context, filter AffiliateLeaderboardFilter) ([]AffiliateLeaderboardEntry, int64, error)
+	GetAffiliateInviteTimeline(ctx context.Context, filter AffiliateInviteTimelineFilter) ([]AffiliateInviteTimelinePoint, error)
+	GetAffiliateTopHalfInviters(ctx context.Context, filter AffiliateTopHalfFilter) (*AffiliateTopHalfSummary, error)
 }
 
 // AffiliateAdminFilter 列表筛选条件
@@ -189,6 +194,84 @@ type AffiliateTransferRecord struct {
 	FrozenQuota         float64   `json:"-"`
 	HistoryQuota        float64   `json:"-"`
 	CreatedAt           time.Time `json:"created_at"`
+}
+
+// AffiliateLeaderboardFilter 排行榜筛选条件。SortBy: "invite_count"（默认）或 "rebate_amount"。
+type AffiliateLeaderboardFilter struct {
+	StartAt  *time.Time
+	EndAt    *time.Time
+	SortBy   string
+	Page     int
+	PageSize int
+}
+
+// AffiliateLeaderboardEntry 单个邀请人在排行榜中的汇总数据。
+type AffiliateLeaderboardEntry struct {
+	InviterID       int64      `json:"inviter_id"`
+	InviterEmail    string     `json:"inviter_email"`
+	InviterUsername string     `json:"inviter_username"`
+	AffCode         string     `json:"aff_code"`
+	InviteCount     int        `json:"invite_count"`
+	TotalRebate     float64    `json:"total_rebate"`
+	LastInvitedAt   *time.Time `json:"last_invited_at,omitempty"`
+}
+
+// AffiliateInviteTimelineFilter 拉新时间分布筛选条件。
+// InviterID 为 nil 时统计全站；Granularity 取值 "day"|"week"|"month"，默认 "day"。
+type AffiliateInviteTimelineFilter struct {
+	InviterID   *int64
+	StartAt     *time.Time
+	EndAt       *time.Time
+	Granularity string
+}
+
+// AffiliateInviteTimelinePoint 某个时间桶内的新增邀请数量。
+type AffiliateInviteTimelinePoint struct {
+	Bucket      time.Time `json:"bucket"`
+	InviteCount int       `json:"invite_count"`
+}
+
+// AffiliateTopHalfMode 头部50%的两种口径。
+const (
+	// AffiliateTopHalfModeHeadcount 人数前50%：邀请人按 invite_count 降序排列，取排名前 ceil(N/2) 名。
+	AffiliateTopHalfModeHeadcount = "headcount"
+	// AffiliateTopHalfModeVolume 邀请量前50%（帕累托口径）：按 invite_count 降序累加，
+	// 取达到总邀请量 ceil(total/2) 所需的最少人数（通常远少于总人数的一半）。
+	AffiliateTopHalfModeVolume = "volume"
+)
+
+// AffiliateTopHalfFilter 头部50%邀请人筛选条件。
+type AffiliateTopHalfFilter struct {
+	StartAt *time.Time
+	EndAt   *time.Time
+	// Mode 取值 AffiliateTopHalfModeHeadcount（默认）或 AffiliateTopHalfModeVolume。
+	Mode string
+	// Limit 返回列表条目上限（用于避免超大邀请人基数时响应过大）；
+	// 汇总统计（TotalInviterCount/TopHalfInviteCount 等）不受 Limit 影响，始终反映完整队列。
+	Limit int
+}
+
+// AffiliateTopHalfInviter 头部50%名单中的单个邀请人。
+type AffiliateTopHalfInviter struct {
+	Rank            int        `json:"rank"`
+	InviterID       int64      `json:"inviter_id"`
+	InviterEmail    string     `json:"inviter_email"`
+	InviterUsername string     `json:"inviter_username"`
+	AffCode         string     `json:"aff_code"`
+	InviteCount     int        `json:"invite_count"`
+	TotalRebate     float64    `json:"total_rebate"`
+	LastInvitedAt   *time.Time `json:"last_invited_at,omitempty"`
+}
+
+// AffiliateTopHalfSummary 头部50%邀请人统计汇总。
+type AffiliateTopHalfSummary struct {
+	Mode                 string                    `json:"mode"`
+	TotalInviterCount    int                       `json:"total_inviter_count"`
+	TopHalfCount         int                       `json:"top_half_count"`
+	TotalInviteCount     int                       `json:"total_invite_count"`
+	TopHalfInviteCount   int                       `json:"top_half_invite_count"`
+	TopHalfInvitePercent float64                   `json:"top_half_invite_percent"`
+	Items                []AffiliateTopHalfInviter `json:"items"`
 }
 
 type AffiliateUserOverview struct {
@@ -606,6 +689,75 @@ func (s *AffiliateService) AdminGetUserOverview(ctx context.Context, userID int6
 		overview.RebateRatePercent = clampAffiliateRebateRate(overview.RebateRatePercent)
 	}
 	return overview, nil
+}
+
+// AdminGetAffiliateLeaderboard 按邀请数量或累计返利对邀请人排行。
+func (s *AffiliateService) AdminGetAffiliateLeaderboard(ctx context.Context, filter AffiliateLeaderboardFilter) ([]AffiliateLeaderboardEntry, int64, error) {
+	if s == nil || s.repo == nil {
+		return nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	return s.repo.GetAffiliateLeaderboard(ctx, normalizeAffiliateLeaderboardFilter(filter))
+}
+
+// AdminGetAffiliateInviteTimeline 返回全站或指定邀请人的拉新时间分布。
+func (s *AffiliateService) AdminGetAffiliateInviteTimeline(ctx context.Context, filter AffiliateInviteTimelineFilter) ([]AffiliateInviteTimelinePoint, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	return s.repo.GetAffiliateInviteTimeline(ctx, normalizeAffiliateTimelineFilter(filter))
+}
+
+// AdminGetAffiliateTopHalfInviters 返回指定日期范围内按邀请数排名前50%的邀请人及汇总统计。
+func (s *AffiliateService) AdminGetAffiliateTopHalfInviters(ctx context.Context, filter AffiliateTopHalfFilter) (*AffiliateTopHalfSummary, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	return s.repo.GetAffiliateTopHalfInviters(ctx, normalizeAffiliateTopHalfFilter(filter))
+}
+
+func normalizeAffiliateTopHalfFilter(filter AffiliateTopHalfFilter) AffiliateTopHalfFilter {
+	if filter.Limit <= 0 {
+		filter.Limit = 100
+	}
+	if filter.Limit > 500 {
+		filter.Limit = 500
+	}
+	if filter.Mode != AffiliateTopHalfModeVolume {
+		filter.Mode = AffiliateTopHalfModeHeadcount
+	}
+	return filter
+}
+
+func normalizeAffiliateLeaderboardFilter(filter AffiliateLeaderboardFilter) AffiliateLeaderboardFilter {
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 20
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	filter.SortBy = strings.TrimSpace(filter.SortBy)
+	if filter.SortBy != "rebate_amount" {
+		filter.SortBy = "invite_count"
+	}
+	return filter
+}
+
+func normalizeAffiliateTimelineFilter(filter AffiliateInviteTimelineFilter) AffiliateInviteTimelineFilter {
+	switch strings.TrimSpace(filter.Granularity) {
+	case "week":
+		filter.Granularity = "week"
+	case "month":
+		filter.Granularity = "month"
+	default:
+		filter.Granularity = "day"
+	}
+	if filter.InviterID != nil && *filter.InviterID <= 0 {
+		filter.InviterID = nil
+	}
+	return filter
 }
 
 func normalizeAffiliateRecordFilter(filter AffiliateRecordFilter) AffiliateRecordFilter {

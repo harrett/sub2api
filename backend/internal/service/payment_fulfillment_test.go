@@ -144,6 +144,18 @@ func (r *paymentFulfillmentAffiliateRepoStub) GetAffiliateUserOverview(context.C
 	panic("unexpected GetAffiliateUserOverview call")
 }
 
+func (r *paymentFulfillmentAffiliateRepoStub) GetAffiliateLeaderboard(context.Context, AffiliateLeaderboardFilter) ([]AffiliateLeaderboardEntry, int64, error) {
+	panic("unexpected GetAffiliateLeaderboard call")
+}
+
+func (r *paymentFulfillmentAffiliateRepoStub) GetAffiliateInviteTimeline(context.Context, AffiliateInviteTimelineFilter) ([]AffiliateInviteTimelinePoint, error) {
+	panic("unexpected GetAffiliateInviteTimeline call")
+}
+
+func (r *paymentFulfillmentAffiliateRepoStub) GetAffiliateTopHalfInviters(context.Context, AffiliateTopHalfFilter) (*AffiliateTopHalfSummary, error) {
+	panic("unexpected GetAffiliateTopHalfInviters call")
+}
+
 type paymentFulfillmentSettingRepoStub struct {
 	values map[string]string
 }

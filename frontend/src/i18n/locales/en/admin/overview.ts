@@ -392,8 +392,32 @@ export default {
       invitesDescription: 'View site-wide inviter and invitee relationships',
       rebatesDescription: 'View recharge orders that generated affiliate rebates',
       transfersDescription: 'View affiliate quota transfers into account balance',
+      statsDescription: 'View the inviter leaderboard and invite time distribution',
       errors: {
         loadFailed: 'Failed to load affiliate records'
+      },
+      stats: {
+        leaderboardTitle: 'Inviter Leaderboard',
+        timelineTitle: 'Invite Time Distribution',
+        inviteCount: 'Invite Count',
+        lastInvitedAt: 'Last Invited',
+        userPlaceholder: 'Search by email or username, defaults to site-wide',
+        changeUser: 'Change user',
+        granularityDay: 'Daily',
+        granularityWeek: 'Weekly',
+        granularityMonth: 'Monthly',
+        noData: 'No data',
+        topHalfTitle: 'Top 50% Inviters',
+        totalInviterCount: 'Total Inviters',
+        topHalfCount: 'Top 50% Headcount',
+        topHalfCountVolume: 'Inviters Needed',
+        totalInviteCount: 'Total Invites',
+        topHalfInvitePercent: 'Top 50% Share',
+        bottomHalf: 'Remaining Inviters',
+        modeHeadcount: 'By Headcount',
+        modeVolume: 'By Volume',
+        modeHeadcountHint: 'Top half of inviters ranked by invite count (headcount split)',
+        modeVolumeHint: 'Smallest set of top inviters (by invite count) whose combined invites reach half the total (Pareto)'
       },
       records: {
         search: 'Search',
