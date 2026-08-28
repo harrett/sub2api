@@ -62,7 +62,8 @@ middleware / handler / service 同时安全导入。
 | 2 | `BILLING_SERVICE_ERROR` | **服务器侧问题** | `503` | — |
 | 3 | `NO_AVAILABLE_ACCOUNTS` | **服务器侧问题** | `503` | — |
 | 3 | `ALL_ACCOUNTS_RATE_LIMITED`（比 `NO_AVAILABLE_ACCOUNTS` 更精确的兜底） | **服务器侧问题** | `429` | — |
-| 3 | `MODEL_NOT_SUPPORTED_IN_GROUP` | **服务器侧问题** | `404` | — |
+| 3 | `MODEL_NOT_SUPPORTED_IN_GROUP`（账号级 model_mapping 不支持） | **服务器侧问题** | `404` | — |
+| 3 | `MODEL_BLOCKED_BY_CHANNEL_POLICY`（渠道「限制模型」主动排除） | **服务器侧问题** | `404`，措辞不含"稍后重试" | — |
 | 4 | `USER_CONCURRENCY_EXCEEDED` | 账户限流问题 | `429` | `SUB2API_RPM_ERROR_STATUS` |
 | 4 | `ACCOUNT_CONCURRENCY_EXCEEDED` / `WAIT_QUEUE_FULL` / `CONCURRENCY_SERVICE_UNAVAILABLE` | **服务器侧问题** | 不变 | — |
 | 5 | `UPSTREAM_CAPACITY_SHED_MIDSTREAM` | **服务器侧问题** | 不变（只改 message，不改 HTTP 状态码） | — |
@@ -71,6 +72,32 @@ middleware / handler / service 同时安全导入。
 错误，按 `slotType` 分流：`user` 是用户侧，`account` 与队列满都是服务器侧。
 错误自带的 `SlotType` 优先于调用方传入的默认值——忽略它会把 account 槽位耗尽
 误判成用户的锅。
+
+**`MODEL_NOT_SUPPORTED_IN_GROUP` 和 `MODEL_BLOCKED_BY_CHANNEL_POLICY` 是两套完全
+独立的"模型不可用"判定**，管理端也是两套完全独立的配置入口，排查时先看清用户
+到底改了哪一边：
+
+- 账号管理 → 编辑账号 → 模型限制 → 模型白名单/映射（`account.model_mapping`）
+  → 命中时进 `MODEL_NOT_SUPPORTED_IN_GROUP`，判定入口是
+  `DiagnoseModelAvailabilityForPlatform`（实时查账号级配置）
+- 渠道管理 → 编辑渠道 → 限制模型 + 模型定价列表（`channel.RestrictModels`）
+  → 命中时进 `MODEL_BLOCKED_BY_CHANNEL_POLICY`，判定入口是调度器的
+  `checkChannelPricingRestriction` 快路径（候选循环之前就短路，
+  `excluded_account_count=0`，错误串里带 `(channel pricing restriction)`）
+
+`DiagnoseModelAvailabilityForPlatform` **不知道渠道限制的存在**，只查账号级
+`model_mapping`。所以只配了渠道限制、没动账号白名单时，诊断查询会误判成
+"账号池暂时不可用"，掉进 `NO_AVAILABLE_ACCOUNTS` 的 503 兜底，提示"请稍后重试"
+——但这是管理员主动排除的模型，重试永远不会成功。`classifySelectionFailureError`
+从错误串里识别出 `(channel pricing restriction)` 这个调度器快路径特有的标记，
+单独给一条不建议重试的 404。**这是"先打标签、中途被整体覆盖"那类坑的第二个
+真实案例**：诊断查询本身没错，只是视野不包含渠道限制这个维度。
+
+配置渠道限制时另外两个真实踩过的坑：
+- 「限制模型」开关在**基础设置** Tab，模型定价列表在 **OpenAI**（或对应平台）
+  Tab，两个 Tab 分开，容易配完模型列表却忘了开关
+- 「同步最新模型」会把上游全部模型（包括你想排除的那个）批量加回定价列表，
+  相当于白配——同步之后要回去确认目标模型没有被加回来
 
 链路 5 与前四条性质不同：不是我们自己产生的错误，是**上游原始 SSE 字节**在
 客户端已经开始收到输出 token 之后原样转发的（此时无法再切账号重试，已发出去
