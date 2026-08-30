@@ -135,6 +135,20 @@ func TestExtractContentModerationInput_GeminiMultiTurnExtractsLatestUser(t *test
 	require.Equal(t, "Q2", input.Text)
 }
 
+func TestExtractContentModerationInput_GeminiBlankRoleTrailingItemSkipped(t *testing.T) {
+	body := []byte(`{
+		"contents": [
+			{"role":"user","parts":[{"text":"Q1"}]},
+			{"parts":[{"text":"ransomware policy classification instructions"}]}
+		]
+	}`)
+
+	input := ExtractContentModerationInput(ContentModerationProtocolGemini, body)
+
+	require.Empty(t, input.Text)
+	require.Empty(t, input.Images)
+}
+
 func TestExtractContentModerationInput_ResponsesAgentToolLoopSkipsAudit(t *testing.T) {
 	body := []byte(`{
 		"input":[
@@ -169,6 +183,22 @@ func TestExtractContentModerationInput_ResponsesLastIsAssistantSkipped(t *testin
 		"input":[
 			{"type":"message","role":"user","content":[{"type":"input_text","text":"q1"}]},
 			{"type":"message","role":"assistant","content":[{"type":"output_text","text":"a1"}]}
+		]
+	}`)
+
+	input := ExtractContentModerationInput(ContentModerationProtocolOpenAIResponses, body)
+
+	require.Empty(t, input.Text)
+	require.Empty(t, input.Images)
+}
+
+// 平台/客户端可能在 input 数组末尾追加无 role 字段的裸 input_text 条目（如
+// ambient 安全指令、上下文提示），这类条目不代表真实用户输入，必须跳过审计。
+func TestExtractContentModerationInput_ResponsesBlankRoleTrailingItemSkipped(t *testing.T) {
+	body := []byte(`{
+		"input":[
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"q1"}]},
+			{"type":"input_text","text":"ransomware policy classification instructions"}
 		]
 	}`)
 

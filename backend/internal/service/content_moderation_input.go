@@ -152,10 +152,7 @@ func collectLastResponsesInput(input gjson.Result, parts *[]string, images *[]st
 
 func isResponsesUserTextItem(item gjson.Result) bool {
 	role := strings.ToLower(strings.TrimSpace(item.Get("role").String()))
-	if role == "user" {
-		return responseItemHasModerationText(item)
-	}
-	if role != "" {
+	if role != "user" {
 		return false
 	}
 	return responseItemHasModerationText(item)
@@ -181,7 +178,7 @@ func collectLastGeminiContent(contents gjson.Result, parts *[]string, images *[]
 	}
 	last := array[len(array)-1]
 	role := strings.ToLower(strings.TrimSpace(last.Get("role").String()))
-	if role != "" && role != "user" {
+	if role != "user" {
 		return
 	}
 	var candidate []string
