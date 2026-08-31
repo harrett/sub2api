@@ -642,7 +642,9 @@ export default {
         compactHome: '简洁首页',
         compactHomeHint: '未设置自定义首页内容时，展示简洁的站点信息页面。',
         hideCcsImportButton: '隐藏 CCS 导入按钮',
-        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮'
+        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮',
+        hideKeyRateMultiplier: '隐藏分组倍率显示',
+        hideKeyRateMultiplierHint: '启用后，普通用户（非管理员）在 API 密钥页面（创建密钥、切换分组等处）将看不到分组的 x 倍率标签'
       },
       purchase: {
         title: '充值/订阅页面',

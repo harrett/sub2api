@@ -647,7 +647,9 @@ export default {
         compactHome: 'Compact Home Page',
         compactHomeHint: 'Show a restrained site identity page when no custom home page content is set.',
         hideCcsImportButton: 'Hide CCS Import Button',
-        hideCcsImportButtonHint: 'When enabled, the "Import to CCS" button will be hidden on the API Keys page'
+        hideCcsImportButtonHint: 'When enabled, the "Import to CCS" button will be hidden on the API Keys page',
+        hideKeyRateMultiplier: 'Hide Group Rate Multiplier',
+        hideKeyRateMultiplierHint: 'When enabled, regular (non-admin) users will not see the group "x rate" label on the API Keys page (create key, switch group, etc.)'
       },
       purchase: {
         title: 'Recharge / Subscription Page',

@@ -237,6 +237,7 @@ export interface PublicSettings {
   home_content: string
   compact_home_enabled: boolean
   hide_ccs_import_button: boolean
+  hide_key_rate_multiplier: boolean
   payment_enabled: boolean
   bundle_subscriptions_enabled?: boolean
   risk_control_enabled: boolean

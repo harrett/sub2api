@@ -344,6 +344,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.HideCcsImportButton != after.HideCcsImportButton {
 		changed = append(changed, "hide_ccs_import_button")
 	}
+	if before.HideKeyRateMultiplier != after.HideKeyRateMultiplier {
+		changed = append(changed, "hide_key_rate_multiplier")
+	}
 	if before.DefaultConcurrency != after.DefaultConcurrency {
 		changed = append(changed, "default_concurrency")
 	}
