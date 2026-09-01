@@ -16,6 +16,11 @@ type CustomMenuItem struct {
 	PageSlug   string `json:"page_slug,omitempty"`
 	Visibility string `json:"visibility"` // "user" or "admin"
 	SortOrder  int    `json:"sort_order"`
+	// AnchorPath is the path of a built-in nav item this custom item should be
+	// inserted right after (e.g. "/redeem"). Empty means "append at the end",
+	// which is also the fallback when the anchor no longer resolves to a
+	// currently visible built-in item.
+	AnchorPath string `json:"anchor_path,omitempty"`
 }
 
 // CustomEndpoint represents an admin-configured API endpoint for quick copy.

@@ -193,6 +193,8 @@ export interface CustomMenuItem {
   page_slug?: string
   visibility: 'user' | 'admin'
   sort_order: number
+  /** Path of a built-in nav item to insert this entry right after; empty = append at the end. */
+  anchor_path?: string
 }
 
 export interface CustomEndpoint {

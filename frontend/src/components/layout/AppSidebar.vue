@@ -198,6 +198,7 @@ import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import type { CustomMenuItem } from '@/types'
 
 interface NavItem {
   path: string
@@ -718,12 +719,6 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon },
-    ...customMenuItemsForUser.value.map((item): NavItem => ({
-      path: `/custom/${item.id}`,
-      label: item.label,
-      icon: null,
-      iconSvg: item.icon_svg,
-    })),
   )
   return items
 }
@@ -734,13 +729,41 @@ function finalizeNav(items: NavItem[]): NavItem[] {
   return authStore.isSimpleMode ? visible.filter(item => !item.hideInSimpleMode) : visible
 }
 
+// mergeCustomItems 把自定义菜单项按 anchor_path 插到对应固定菜单项之后；
+// anchor_path 为空，或指向的固定项当前不可见（被 feature flag / simple 模式过滤掉），
+// 则追加到列表末尾兜底（即历史行为）。
+function mergeCustomItems(fixedItems: NavItem[], customItems: CustomMenuItem[]): NavItem[] {
+  const toNavItem = (item: CustomMenuItem): NavItem => ({
+    path: `/custom/${item.id}`,
+    label: item.label,
+    icon: null,
+    iconSvg: item.icon_svg,
+  })
+  const anchoredPaths = new Set(fixedItems.map((f) => f.path))
+  const result: NavItem[] = []
+  for (const fixed of fixedItems) {
+    result.push(fixed)
+    for (const item of customItems) {
+      if (item.anchor_path === fixed.path) result.push(toNavItem(item))
+    }
+  }
+  for (const item of customItems) {
+    if (!item.anchor_path || !anchoredPaths.has(item.anchor_path)) result.push(toNavItem(item))
+  }
+  return result
+}
+
 // User navigation items (for regular users)
-const userNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(true)))
+const userNavItems = computed((): NavItem[] =>
+  mergeCustomItems(finalizeNav(buildSelfNavItems(true)), customMenuItemsForUser.value)
+)
 
 // Personal navigation items (for admin's "My Account" section, without Dashboard).
 // Admins access 可用渠道 from this section just like regular users — there is no
 // separate admin entry, since the page is purely a user-facing view.
-const personalNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(false)))
+const personalNavItems = computed((): NavItem[] =>
+  mergeCustomItems(finalizeNav(buildSelfNavItems(false)), customMenuItemsForUser.value)
+)
 
 // Custom menu items filtered by visibility
 const customMenuItemsForUser = computed(() => {
@@ -831,17 +854,11 @@ const adminNavItems = computed((): NavItem[] => {
     const filtered = visible.filter(item => !item.hideInSimpleMode)
     filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
     filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
-    for (const cm of customMenuItemsForAdmin.value) {
-      filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
-    }
-    return filtered
+    return mergeCustomItems(filtered, customMenuItemsForAdmin.value)
   }
 
   visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
-  for (const cm of customMenuItemsForAdmin.value) {
-    visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
-  }
-  return visible
+  return mergeCustomItems(visible, customMenuItemsForAdmin.value)
 })
 
 function toggleSidebar() {

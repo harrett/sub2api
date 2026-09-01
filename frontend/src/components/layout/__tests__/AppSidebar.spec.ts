@@ -42,6 +42,25 @@ describe('AppSidebar scroll position persistence', () => {
   })
 })
 
+describe('AppSidebar custom menu anchor placement', () => {
+  it('inserts custom items after their anchor instead of always appending at the end', () => {
+    expect(componentSource).toContain('function mergeCustomItems(')
+    expect(componentSource).toContain('item.anchor_path === fixed.path')
+    expect(componentSource).toContain('!item.anchor_path || !anchoredPaths.has(item.anchor_path)')
+  })
+
+  it('wires mergeCustomItems into all three nav computeds', () => {
+    expect(componentSource).toContain(
+      'mergeCustomItems(finalizeNav(buildSelfNavItems(true)), customMenuItemsForUser.value)'
+    )
+    expect(componentSource).toContain(
+      'mergeCustomItems(finalizeNav(buildSelfNavItems(false)), customMenuItemsForUser.value)'
+    )
+    expect(componentSource).toContain('mergeCustomItems(filtered, customMenuItemsForAdmin.value)')
+    expect(componentSource).toContain('mergeCustomItems(visible, customMenuItemsForAdmin.value)')
+  })
+})
+
 describe('AppSidebar header styles', () => {
   it('does not clip the version badge dropdown', () => {
     const sidebarHeaderBlockMatch = styleSource.match(/\.sidebar-header\s*\{[\s\S]*?\n {2}\}/)

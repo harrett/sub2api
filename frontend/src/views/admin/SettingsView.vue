@@ -6761,6 +6761,27 @@
                     </select>
                   </div>
 
+                  <!-- Anchor position -->
+                  <div class="sm:col-span-2">
+                    <label
+                      class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >
+                      {{ t("admin.settings.customMenu.anchorPosition") }}
+                    </label>
+                    <select v-model="item.anchor_path" class="input text-sm">
+                      <option value="">
+                        {{ t("admin.settings.customMenu.anchorEnd") }}
+                      </option>
+                      <option
+                        v-for="anchor in anchorOptionsFor(item.visibility)"
+                        :key="anchor.path"
+                        :value="anchor.path"
+                      >
+                        {{ t("admin.settings.customMenu.anchorAfter", { name: anchor.label }) }}
+                      </option>
+                    </select>
+                  </div>
+
                   <!-- URL (full width) -->
                   <div class="sm:col-span-2">
                     <label
@@ -8847,6 +8868,7 @@ import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSi
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
+import { USER_MENU_ANCHORS, ADMIN_MENU_ANCHORS } from "@/config/customMenuAnchors";
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
 import {
   isRegistrationEmailSuffixDomainValid,
@@ -9627,6 +9649,7 @@ const form = reactive<SettingsForm>({
     url: string;
     visibility: "user" | "admin";
     sort_order: number;
+    anchor_path: string;
   }>,
   custom_endpoints: [] as Array<{
     name: string;
@@ -10600,7 +10623,14 @@ function addMenuItem() {
     url: "",
     visibility: "user",
     sort_order: form.custom_menu_items.length,
+    anchor_path: "",
   });
+}
+
+// 插入位置候选项：按当前菜单项的可见角色，从对应的固定菜单目录中取。
+function anchorOptionsFor(visibility: "user" | "admin") {
+  const catalog = visibility === "admin" ? ADMIN_MENU_ANCHORS : USER_MENU_ANCHORS;
+  return catalog.map((a) => ({ path: a.path, label: t(a.labelKey) }));
 }
 
 function removeMenuItem(index: number) {
