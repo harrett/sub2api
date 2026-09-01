@@ -300,12 +300,25 @@ func limitContentModerationImages(images []string) []string {
 	return []string{images[int(idx.Int64())]}
 }
 
+// codexAmbientSuggestionPolicyMarker 是 Codex ambient-suggestion 安全分类器提示词的固定
+// 特征串。这类请求虽然以 role=="user" 发出，但内容是平台自身下发的安全策略文档，
+// 不是终端用户输入，需要在关键词/API 审计前排除，否则策略文档里列举的违规内容示例
+// （如 webshell、ransomware）会被当成用户请求命中拦截。
+const codexAmbientSuggestionPolicyMarker = "expert at upholding safety and compliance standards for Codex ambient suggestions"
+
+func isCodexAmbientSuggestionPolicyText(text string) bool {
+	return strings.Contains(text, codexAmbientSuggestionPolicyMarker)
+}
+
 func addModerationText(parts *[]string, text string) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return
 	}
 	if strings.Contains(text, "<system-reminder>") {
+		return
+	}
+	if isCodexAmbientSuggestionPolicyText(text) {
 		return
 	}
 	*parts = append(*parts, text)

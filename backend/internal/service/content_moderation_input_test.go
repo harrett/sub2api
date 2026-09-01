@@ -207,3 +207,30 @@ func TestExtractContentModerationInput_ResponsesBlankRoleTrailingItemSkipped(t *
 	require.Empty(t, input.Text)
 	require.Empty(t, input.Images)
 }
+
+// Codex 的 ambient-suggestion 安全分类器以 role=="user" 发出自身的策略文档（含
+// webshell/ransomware 等违规内容示例），不是终端用户输入，必须跳过审计。
+func TestExtractContentModerationInput_ResponsesCodexAmbientSuggestionPolicySkipped(t *testing.T) {
+	body := []byte(`{
+		"input":[
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"You are an expert at upholding safety and compliance standards for Codex ambient suggestions. ... webshell ... ransomware ..."}]}
+		]
+	}`)
+
+	input := ExtractContentModerationInput(ContentModerationProtocolOpenAIResponses, body)
+
+	require.Empty(t, input.Text)
+	require.Empty(t, input.Images)
+}
+
+func TestExtractContentModerationInput_AnthropicCodexAmbientSuggestionPolicySkipped(t *testing.T) {
+	body := []byte(`{
+		"messages": [
+			{"role":"user","content":"You are an expert at upholding safety and compliance standards for Codex ambient suggestions. ... webshell ..."}
+		]
+	}`)
+
+	input := ExtractContentModerationInput(ContentModerationProtocolAnthropicMessages, body)
+
+	require.Empty(t, input.Text)
+}
