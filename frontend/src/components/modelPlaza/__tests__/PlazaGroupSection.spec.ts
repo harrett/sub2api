@@ -18,6 +18,10 @@ vi.mock('@/stores/app', () => ({
   useAppStore: () => ({ cachedPublicSettings: null })
 }))
 
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({ isAdmin: false })
+}))
+
 function ladderModel(tiers: number): PlazaModel {
   const intervals = Array.from({ length: tiers }, (_, i) => ({
     min_tokens: i * 272000,

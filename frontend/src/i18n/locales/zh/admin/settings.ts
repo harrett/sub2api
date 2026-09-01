@@ -648,7 +648,7 @@ export default {
         hideCcsImportButton: '隐藏 CCS 导入按钮',
         hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮',
         hideKeyRateMultiplier: '隐藏分组倍率显示',
-        hideKeyRateMultiplierHint: '启用后，普通用户（非管理员）在 API 密钥页面（创建密钥、切换分组等处）将看不到分组的 x 倍率标签'
+        hideKeyRateMultiplierHint: '启用后，普通用户（非管理员）在 API 密钥、我的订阅、购买订阅、可用渠道、模型广场等自助页面将看不到分组的 x 倍率标签'
       },
       purchase: {
         title: '充值/订阅页面',

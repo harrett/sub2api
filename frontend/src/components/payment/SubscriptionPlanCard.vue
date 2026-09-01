@@ -45,7 +45,7 @@
 
       <!-- Group quota info (compact) -->
       <div class="mb-3 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-dark-700/50">
-        <div class="flex items-center justify-between">
+        <div v-if="showRateMultiplier" class="flex items-center justify-between">
           <span class="text-gray-400 dark:text-dark-500">{{ t('payment.planCard.rate') }}</span>
           <span class="font-medium text-gray-700 dark:text-gray-300">{{ rateDisplay }}</span>
         </div>
@@ -110,6 +110,7 @@ import { useI18n } from 'vue-i18n'
 import type { SubscriptionPlan } from '@/types/payment'
 import type { UserSubscription } from '@/types'
 import { useAppStore } from '@/stores/app'
+import { useShowRateMultiplier } from '@/composables/useRateMultiplierVisibility'
 import { hasPeakRate as groupHasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { planValiditySuffix } from './validity'
 import { currencySymbol } from '@/components/payment/currency'
@@ -155,6 +156,7 @@ const rateDisplay = computed(() => {
 })
 
 const appStore = useAppStore()
+const showRateMultiplier = useShowRateMultiplier()
 const planCurrencySymbol = computed(() => currencySymbol(props.plan.currency || 'USD'))
 
 const hasPeakRate = computed(() => groupHasPeakRate(props.plan))

@@ -17,6 +17,7 @@
           :peak-end="group.peak_end"
           :peak-rate-multiplier="group.peak_rate_multiplier"
           always-show-rate
+          :show-rate="showRateMultiplier"
         />
         <span
           v-if="group.is_exclusive"
@@ -82,6 +83,7 @@ import type { GroupPlatform, SubscriptionType } from '@/types'
 import { platformBorderStrongClass } from '@/utils/platformColors'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { useAppStore } from '@/stores/app'
+import { useShowRateMultiplier } from '@/composables/useRateMultiplierVisibility'
 
 const props = defineProps<{
   group: ModelPlazaGroup
@@ -89,6 +91,7 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const showRateMultiplier = useShowRateMultiplier()
 
 /** 高峰窗口描述(含倍率与服务器时区标注);分组未启用高峰为空串。 */
 const peakWindow = computed(() => {

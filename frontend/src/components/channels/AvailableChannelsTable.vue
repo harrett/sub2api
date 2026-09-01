@@ -102,6 +102,7 @@
                     :rate-multiplier="g.rate_multiplier"
                     :user-rate-multiplier="userGroupRates[g.id] ?? null"
                     always-show-rate
+                    :show-rate="showRateMultiplier"
                   />
                   <span
                     v-if="hasPeakRate(g)"
@@ -136,6 +137,7 @@
                     :rate-multiplier="g.rate_multiplier"
                     :user-rate-multiplier="userGroupRates[g.id] ?? null"
                     always-show-rate
+                    :show-rate="showRateMultiplier"
                   />
                   <span
                     v-if="hasPeakRate(g)"
@@ -241,6 +243,7 @@
                         :rate-multiplier="g.rate_multiplier"
                         :user-rate-multiplier="userGroupRates[g.id] ?? null"
                         always-show-rate
+                        :show-rate="showRateMultiplier"
                       />
                       <span
                         v-if="hasPeakRate(g)"
@@ -276,6 +279,7 @@
                         :rate-multiplier="g.rate_multiplier"
                         :user-rate-multiplier="userGroupRates[g.id] ?? null"
                         always-show-rate
+                        :show-rate="showRateMultiplier"
                       />
                       <span
                         v-if="hasPeakRate(g)"
@@ -329,6 +333,7 @@ import type { UserAvailableChannel, UserAvailableGroup, UserChannelPlatformSecti
 import type { GroupPlatform, SubscriptionType } from '@/types'
 import { platformBadgeClass } from '@/utils/platformColors'
 import { useAppStore } from '@/stores/app'
+import { useShowRateMultiplier } from '@/composables/useRateMultiplierVisibility'
 import { hasPeakRate as groupHasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 
 const props = defineProps<{
@@ -364,6 +369,7 @@ function publicGroups(section: UserChannelPlatformSection): UserAvailableGroup[]
 }
 
 const appStore = useAppStore()
+const showRateMultiplier = useShowRateMultiplier()
 
 function hasPeakRate(group: UserAvailableGroup): boolean {
   return groupHasPeakRate(group)

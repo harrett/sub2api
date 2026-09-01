@@ -57,6 +57,7 @@ vi.mock('@/stores/auth', () => ({
       balance: 0,
     },
     refreshUser,
+    isAdmin: false,
   }),
 }))
 
@@ -78,6 +79,15 @@ vi.mock('@/stores', () => ({
     showError,
     showInfo,
     showWarning,
+  }),
+}))
+
+vi.mock('@/stores/app', () => ({
+  useAppStore: () => ({
+    showError,
+    showInfo,
+    showWarning,
+    cachedPublicSettings: null,
   }),
 }))
 
