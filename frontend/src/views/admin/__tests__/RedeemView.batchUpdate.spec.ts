@@ -2,16 +2,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 import RedeemView from '../RedeemView.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 
-const { listRedeemCodes, batchUpdateRedeemCodes, getAllGroups, showSuccess, showError, showInfo } =
-  vi.hoisted(() => ({
-    listRedeemCodes: vi.fn(),
-    batchUpdateRedeemCodes: vi.fn(),
-    getAllGroups: vi.fn(),
-    showSuccess: vi.fn(),
-    showError: vi.fn(),
-    showInfo: vi.fn()
-  }))
+const {
+  listRedeemCodes,
+  batchUpdateRedeemCodes,
+  batchDeleteRedeemCodes,
+  getAllGroups,
+  showSuccess,
+  showError,
+  showInfo
+} = vi.hoisted(() => ({
+  listRedeemCodes: vi.fn(),
+  batchUpdateRedeemCodes: vi.fn(),
+  batchDeleteRedeemCodes: vi.fn(),
+  getAllGroups: vi.fn(),
+  showSuccess: vi.fn(),
+  showError: vi.fn(),
+  showInfo: vi.fn()
+}))
 
 vi.mock('@/api/admin', () => ({
   adminAPI: {
@@ -19,7 +28,7 @@ vi.mock('@/api/admin', () => ({
       list: listRedeemCodes,
       generate: vi.fn(),
       delete: vi.fn(),
-      batchDelete: vi.fn(),
+      batchDelete: batchDeleteRedeemCodes,
       batchUpdate: batchUpdateRedeemCodes,
       exportCodes: vi.fn()
     },
@@ -106,6 +115,7 @@ describe('admin RedeemView batch update', () => {
 
     listRedeemCodes.mockReset()
     batchUpdateRedeemCodes.mockReset()
+    batchDeleteRedeemCodes.mockReset()
     getAllGroups.mockReset()
     showSuccess.mockReset()
     showError.mockReset()
@@ -142,6 +152,7 @@ describe('admin RedeemView batch update', () => {
       pages: 1
     })
     batchUpdateRedeemCodes.mockResolvedValue({ updated: 1, message: 'ok' })
+    batchDeleteRedeemCodes.mockResolvedValue({ deleted: 1, message: 'ok' })
     getAllGroups.mockResolvedValue([])
   })
 
@@ -183,5 +194,39 @@ describe('admin RedeemView batch update', () => {
       notes: 'maintenance'
     })
     expect(showSuccess).toHaveBeenCalledWith('admin.redeem.batchUpdateSuccess')
+  })
+
+  it('deletes selected redeem codes after confirming the batch delete dialog', async () => {
+    const wrapper = mount(RedeemView, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          Select: SelectStub,
+          GroupBadge: true,
+          GroupOptionItem: true,
+          Icon: true,
+          Teleport: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.findAll('[data-test="select-code"]')[0].setValue(true)
+    await wrapper.get('[data-test="batch-delete-open"]').trigger('click')
+    await flushPromises()
+
+    const dialog = wrapper.findAllComponents(ConfirmDialog).find((d) => d.props('show'))
+    dialog?.vm.$emit('confirm')
+    await flushPromises()
+
+    expect(batchDeleteRedeemCodes).toHaveBeenCalledWith([1])
+    expect(showSuccess).toHaveBeenCalledWith('admin.redeem.batchDeleteSuccess')
   })
 })

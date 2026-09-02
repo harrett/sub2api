@@ -48,6 +48,15 @@
               <Icon name="edit" size="md" class="mr-2" />
               {{ t('admin.redeem.batchUpdate') }}
             </button>
+            <button
+              data-test="batch-delete-open"
+              @click="openBatchDeleteDialog"
+              :disabled="selectedCount === 0 || batchDeleting"
+              class="btn btn-danger"
+            >
+              <Icon name="trash" size="md" class="mr-2" />
+              {{ t('admin.redeem.batchDelete') }}
+            </button>
             <button @click="showGenerateDialog = true" class="btn btn-primary">
               {{ t('admin.redeem.generateCodes') }}
             </button>
@@ -227,6 +236,13 @@
             >
               {{ t('admin.redeem.batchUpdate') }}
             </button>
+            <button
+              type="button"
+              class="btn btn-danger btn-sm"
+              @click="openBatchDeleteDialog"
+            >
+              {{ t('admin.redeem.batchDelete') }}
+            </button>
           </div>
         </div>
 
@@ -258,6 +274,18 @@
       danger
       @confirm="confirmDelete"
       @cancel="showDeleteDialog = false"
+    />
+
+    <!-- Batch Delete Confirmation Dialog -->
+    <ConfirmDialog
+      :show="showBatchDeleteDialog"
+      :title="t('admin.redeem.batchDelete')"
+      :message="t('admin.redeem.batchDeleteConfirm', { count: selectedCount })"
+      :confirm-text="t('common.delete')"
+      :cancel-text="t('common.cancel')"
+      danger
+      @confirm="confirmBatchDelete"
+      @cancel="showBatchDeleteDialog = false"
     />
 
     <!-- Delete Unused Codes Dialog -->
@@ -797,6 +825,8 @@ let abortController: AbortController | null = null
 const showDeleteDialog = ref(false)
 const showDeleteUnusedDialog = ref(false)
 const showBatchUpdateDialog = ref(false)
+const showBatchDeleteDialog = ref(false)
+const batchDeleting = ref(false)
 const deletingCode = ref<RedeemCode | null>(null)
 const copiedCode = ref<string | null>(null)
 
@@ -1135,6 +1165,36 @@ const confirmDeleteUnused = async () => {
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.redeem.failedToDeleteUnused'))
     console.error('Error deleting unused codes:', error)
+  }
+}
+
+const openBatchDeleteDialog = () => {
+  if (selectedCount.value === 0) {
+    appStore.showInfo(t('admin.redeem.selectCodesFirst'))
+    return
+  }
+  showBatchDeleteDialog.value = true
+}
+
+const confirmBatchDelete = async () => {
+  const ids = Array.from(selectedCodeIds.value)
+  if (ids.length === 0) {
+    showBatchDeleteDialog.value = false
+    return
+  }
+
+  batchDeleting.value = true
+  try {
+    const result = await adminAPI.redeem.batchDelete(ids)
+    appStore.showSuccess(t('admin.redeem.batchDeleteSuccess', { count: result.deleted }))
+    showBatchDeleteDialog.value = false
+    clearSelectedCodes()
+    loadCodes()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.redeem.failedToBatchDelete'))
+    console.error('Error batch deleting codes:', error)
+  } finally {
+    batchDeleting.value = false
   }
 }
 
