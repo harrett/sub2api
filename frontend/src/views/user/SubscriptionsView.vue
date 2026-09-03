@@ -11,7 +11,7 @@
       <section v-if="bundleEnabled && bundleSubscriptions.length > 0" class="space-y-3">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Cross-platform contracts</h2>
-          <button class="btn btn-primary text-sm" @click="router.push('/purchase')">Buy or extend</button>
+          <button v-if="paymentEnabled" class="btn btn-primary text-sm" @click="router.push('/purchase')">Buy or extend</button>
         </div>
         <div class="grid gap-4 lg:grid-cols-2">
           <div v-for="subscription in bundleSubscriptions" :key="subscription.id" class="rounded-xl border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-800">
@@ -51,51 +51,53 @@
         <div
           v-for="subscription in subscriptions"
           :key="subscription.id"
-          class="overflow-hidden rounded-2xl border bg-white dark:bg-dark-800"
+          class="overflow-hidden rounded-2xl border bg-white shadow-sm transition-shadow hover:shadow-lg dark:bg-dark-800 dark:shadow-none"
           :class="platformBorderClass(subscription.group?.platform || '')"
         >
           <!-- Header -->
           <div
-            class="flex items-center justify-between border-b border-gray-100 p-4 dark:border-dark-700"
+            class="relative flex items-center justify-between gap-3 overflow-hidden p-4"
+            :class="isOpenAiPlatform(subscription) ? '' : ['bg-gradient-to-br', platformGradientClass(subscription.group?.platform || '')]"
+            :style="isOpenAiPlatform(subscription) ? openAiHeaderStyle : undefined"
           >
-            <div class="flex items-center gap-3">
-              <div :class="['h-1.5 w-1.5 shrink-0 rounded-full', platformAccentDotClass(subscription.group?.platform || '')]" />
-              <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="font-semibold text-gray-900 dark:text-white">
+            <div class="relative flex min-w-0 items-center gap-3">
+              <div :class="['h-2 w-2 shrink-0 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]']" />
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="truncate font-semibold text-white drop-shadow-sm">
                     {{ subscription.group?.name || `Group #${subscription.group_id}` }}
                   </h3>
-                  <span :class="['rounded-md border px-2 py-0.5 text-[11px] font-medium', platformBadgeClass(subscription.group?.platform || '')]">
+                  <span class="shrink-0 rounded-md border border-white/30 bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
                     {{ platformLabel(subscription.group?.platform || '') }}
                   </span>
                 </div>
-                <p v-if="subscription.group?.description" class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
+                <p v-if="subscription.group?.description" class="mt-0.5 truncate text-xs text-white/70">
                   {{ subscription.group.description }}
                 </p>
-                <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400 dark:text-gray-500">
+                <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/60">
                   <span v-if="showRateMultiplier">{{ t('payment.planCard.rate') }}: ×{{ subscription.group?.rate_multiplier ?? 1 }}</span>
-                  <span v-if="subscriptionHasPeakRate(subscription)" class="text-amber-700 dark:text-amber-300">
+                  <span v-if="subscriptionHasPeakRate(subscription)" class="text-amber-300">
                     {{ t('payment.planCard.peakRate') }}: {{ subscriptionPeakRateLabel(subscription) }}
                   </span>
                 </div>
               </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="relative flex shrink-0 flex-col items-end gap-2">
               <span
                 :class="[
-                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                  'rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset backdrop-blur-sm',
                   subscription.status === 'active'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                    ? 'bg-emerald-400/20 text-emerald-100 ring-emerald-300/30'
                     : subscription.status === 'expired'
-                      ? 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-400'
-                      : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                      ? 'bg-white/10 text-white/70 ring-white/20'
+                      : 'bg-red-400/20 text-red-100 ring-red-300/30'
                 ]"
               >
                 {{ t(`userSubscriptions.status.${subscription.status}`) }}
               </span>
               <button
-                v-if="subscription.status === 'active'"
-                :class="['rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors', platformButtonClass(subscription.group?.platform || '')]"
+                v-if="subscription.status === 'active' && paymentEnabled"
+                class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-900 shadow-sm transition-colors hover:bg-white/90 active:bg-white/80"
                 @click="router.push({ path: '/purchase', query: { tab: 'subscription', group: String(subscription.group_id) } })"
               >
                 {{ t('payment.renewNow') }}
@@ -284,28 +286,36 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTimeToMinute } from '@/utils/format'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
-import { platformBorderClass, platformBadgeClass, platformButtonClass, platformLabel } from '@/utils/platformColors'
+import { platformBorderClass, platformGradientClass, platformLabel } from '@/utils/platformColors'
 import {
   getExpirationDateRelation,
   getRemainingDurationParts,
   isOneTimeDailyQuota,
   type RemainingDurationParts
 } from '@/utils/subscriptionQuota'
+import codexProBg from '@/assets/images/subscriptions/codex-pro-bg.jpg'
 
-function platformAccentDotClass(p: string): string {
-  switch (p) {
-    case 'anthropic': return 'bg-orange-500'
-    case 'openai': return 'bg-emerald-500'
-    case 'antigravity': return 'bg-purple-500'
-    case 'gemini': return 'bg-blue-500'
-    default: return 'bg-gray-400'
-  }
+function isOpenAiPlatform(subscription: UserSubscription): boolean {
+  return subscription.group?.platform === 'openai'
+}
+
+// `contain` (not `cover`) so the full banner — including the top logo row and
+// the bottom tagline — always shows regardless of the header's content-driven
+// height; `cover` was cropping both on short cards.
+const openAiHeaderStyle = {
+  backgroundImage: `linear-gradient(115deg, rgba(6,6,24,0.7) 0%, rgba(6,6,30,0.4) 55%, rgba(6,6,26,0.7) 100%), url(${codexProBg})`,
+  backgroundRepeat: 'no-repeat',
+  backgroundSize: 'cover, contain',
+  backgroundPosition: 'center, right center',
+  backgroundColor: '#05050f'
 }
 
 const { t } = useI18n()
 const router = useRouter()
 const appStore = useAppStore()
 const showRateMultiplier = useShowRateMultiplier()
+
+const paymentEnabled = computed(() => appStore.cachedPublicSettings?.payment_enabled !== false)
 
 const subscriptions = ref<UserSubscription[]>([])
 const bundleSubscriptions = ref<BundleSubscription[]>([])
