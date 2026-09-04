@@ -129,6 +129,139 @@
         </div>
       </div>
 
+      <!-- Conversation capture -->
+      <div class="card p-6">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.backup.conversationCapture.title') }}
+            </h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.backup.conversationCapture.description') }}
+            </p>
+          </div>
+          <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input v-model="captureForm.enabled" type="checkbox" />
+            <span>{{ t('admin.backup.conversationCapture.enabled') }}</span>
+          </label>
+        </div>
+
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input v-model="captureForm.reuse_backup_s3" type="checkbox" />
+          <span>{{ t('admin.backup.conversationCapture.reuseBackupS3') }}</span>
+        </label>
+
+        <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.bucket') }}</label>
+            <input v-model="captureForm.bucket" class="input w-full" :placeholder="captureForm.reuse_backup_s3 ? t('admin.backup.imageStorage.bucketInherited') : ''" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.prefix') }}</label>
+            <input v-model="captureForm.prefix" class="input w-full" placeholder="conversations/" />
+          </div>
+
+          <template v-if="!captureForm.reuse_backup_s3">
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.s3.endpoint') }}</label>
+              <input v-model="captureForm.endpoint" class="input w-full" placeholder="https://<account_id>.r2.cloudflarestorage.com" />
+            </div>
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.s3.region') }}</label>
+              <input v-model="captureForm.region" class="input w-full" placeholder="auto" />
+            </div>
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.s3.accessKeyId') }}</label>
+              <input v-model="captureForm.access_key_id" class="input w-full" />
+            </div>
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.s3.secretAccessKey') }}</label>
+              <input v-model="captureForm.secret_access_key" type="password" class="input w-full" :placeholder="captureSecretConfigured ? t('admin.backup.s3.secretConfigured') : ''" />
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
+              <input v-model="captureForm.force_path_style" type="checkbox" />
+              <span>{{ t('admin.backup.s3.forcePathStyle') }}</span>
+            </label>
+          </template>
+
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.previewBytes') }}</label>
+            <input v-model.number="captureForm.preview_bytes" type="number" min="64" max="2048" class="input w-full" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.previewBytesHint') }}</p>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.indexRetentionDays') }}</label>
+            <input v-model.number="captureForm.index_retention_days" type="number" min="1" max="90" class="input w-full" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.indexRetentionDaysHint') }}</p>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.spoolMaxGiB') }}</label>
+            <input v-model.number="captureSpoolMaxGiB" type="number" min="1" step="0.5" class="input w-full" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.spoolMaxGiBHint') }}</p>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.queueCapacity') }}</label>
+            <input v-model.number="captureForm.queue_capacity" type="number" min="100" max="20000" class="input w-full" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.queueCapacityHint') }}</p>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.diskMinFreeGiB') }}</label>
+            <input v-model.number="captureDiskMinFreeGiB" type="number" min="1" step="0.5" class="input w-full" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.diskMinFreeGiBHint') }}</p>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.diskCriticalFreeGiB') }}</label>
+            <input v-model.number="captureDiskCriticalFreeGiB" type="number" min="0.5" step="0.5" class="input w-full" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.diskCriticalFreeGiBHint') }}</p>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.sampleRate') }}</label>
+            <input v-model.number="captureForm.sample_rate" type="number" min="0.01" max="1" step="0.01" class="input w-full" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.sampleRateHint') }}</p>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div v-if="captureRuntime" class="mt-4 rounded-lg bg-gray-50 p-3 text-xs dark:bg-gray-800/60">
+          <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div>
+              <div class="text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.runtime.queue') }}</div>
+              <div class="font-mono text-gray-900 dark:text-gray-100">{{ captureRuntime.queue_depth }} / {{ captureRuntime.queue_capacity }}</div>
+            </div>
+            <div>
+              <div class="text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.runtime.dropped') }}</div>
+              <div class="font-mono text-gray-900 dark:text-gray-100">{{ captureRuntime.dropped_total }}</div>
+            </div>
+            <div>
+              <div class="text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.runtime.spool') }}</div>
+              <div class="font-mono text-gray-900 dark:text-gray-100">{{ formatBytes(captureRuntime.spool_bytes) }} / {{ formatBytes(captureRuntime.spool_max_bytes) }}</div>
+            </div>
+            <div>
+              <div class="text-gray-500 dark:text-gray-400">{{ t('admin.backup.conversationCapture.runtime.pendingUploads') }}</div>
+              <div class="font-mono text-gray-900 dark:text-gray-100">{{ captureRuntime.pending_uploads }}</div>
+            </div>
+          </div>
+          <p v-if="captureRuntime.degraded" class="mt-2 text-amber-600 dark:text-amber-400">
+            {{ t('admin.backup.conversationCapture.runtime.degraded', { reason: captureRuntime.degraded_reason }) }}
+          </p>
+          <p v-if="captureRuntime.enabled && !captureRuntime.object_store_enabled" class="mt-2 text-amber-600 dark:text-amber-400">
+            {{ t('admin.backup.conversationCapture.runtime.localOnly') }}
+          </p>
+          <p v-if="captureRuntime.last_error" class="mt-2 break-all text-red-600 dark:text-red-400">
+            {{ captureRuntime.last_error }}
+          </p>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button type="button" class="btn btn-secondary btn-sm" :disabled="testingCapture" @click="testCapture">
+            {{ testingCapture ? t('common.loading') : t('admin.backup.s3.testConnection') }}
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" :disabled="savingCapture" @click="saveCaptureConfig">
+            {{ savingCapture ? t('common.loading') : t('common.save') }}
+          </button>
+        </div>
+      </div>
+
       <!-- Schedule Config -->
       <div class="card p-6">
         <div class="mb-4">
@@ -411,6 +544,10 @@ import type {
   BackupDownloadPart,
   ImageStorageConfig,
 } from '@/api/admin/backup'
+import type {
+  ConversationCaptureSettings,
+  ConversationCaptureRuntime,
+} from '@/api/admin/conversationCapture'
 import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from '@/composables/useStepUp'
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
 
@@ -462,6 +599,59 @@ const imageStorageForm = ref<ImageStorageConfig>({
 const imageStorageSecretConfigured = ref(false)
 const savingImageStorage = ref(false)
 const testingImageStorage = ref(false)
+
+// 会话数据留存。默认沿用备份 S3 凭证，只用不同前缀区分对象。
+const captureForm = ref<ConversationCaptureSettings>({
+  enabled: false,
+  reuse_backup_s3: true,
+  sample_rate: 1,
+  excluded_group_ids: [],
+  bucket: '',
+  prefix: 'conversations/',
+  endpoint: '',
+  region: 'auto',
+  access_key_id: '',
+  secret_access_key: '',
+  force_path_style: false,
+  queue_capacity: 10000,
+  queue_max_bytes: 268435456,
+  max_request_bytes: 2097152,
+  max_response_bytes: 2097152,
+  preview_bytes: 1024,
+  rotate_bytes: 67108864,
+  rotate_interval_seconds: 300,
+  spool_max_bytes: 2147483648,
+  disk_min_free_bytes: 8589934592,
+  disk_critical_free_bytes: 5368709120,
+  index_retention_days: 30,
+})
+const captureSecretConfigured = ref(false)
+const captureRuntime = ref<ConversationCaptureRuntime | null>(null)
+const savingCapture = ref(false)
+const testingCapture = ref(false)
+
+const GIB = 1024 * 1024 * 1024
+
+// 磁盘阈值对运维来说是 GiB 单位的决策，表单按 GiB 编辑、按字节存储。
+function gibField(read: () => number, write: (bytes: number) => void) {
+  return computed({
+    get: () => Math.round((read() / GIB) * 10) / 10,
+    set: (value: number) => write(Math.max(0, Number(value) || 0) * GIB),
+  })
+}
+
+const captureSpoolMaxGiB = gibField(
+  () => captureForm.value.spool_max_bytes,
+  (bytes) => { captureForm.value.spool_max_bytes = bytes },
+)
+const captureDiskMinFreeGiB = gibField(
+  () => captureForm.value.disk_min_free_bytes,
+  (bytes) => { captureForm.value.disk_min_free_bytes = bytes },
+)
+const captureDiskCriticalFreeGiB = gibField(
+  () => captureForm.value.disk_critical_free_bytes,
+  (bytes) => { captureForm.value.disk_critical_free_bytes = bytes },
+)
 
 // Schedule config
 const scheduleForm = ref<BackupScheduleConfig>({
@@ -681,6 +871,68 @@ async function testImageStorage() {
   }
 }
 
+async function loadCaptureConfig() {
+  try {
+    const config = await adminAPI.conversationCapture.getCaptureConfig()
+    captureSecretConfigured.value = Boolean(config.secret_configured)
+    captureForm.value = { ...config, secret_access_key: '' }
+  } catch (error) {
+    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
+  }
+}
+
+async function loadCaptureRuntime() {
+  try {
+    captureRuntime.value = await adminAPI.conversationCapture.getCaptureRuntime()
+  } catch {
+    // 运行态是观测信息，取不到不打断配置页。
+    captureRuntime.value = null
+  }
+}
+
+async function saveCaptureConfig() {
+  savingCapture.value = true
+  try {
+    await backupStepUp.run(() => adminAPI.conversationCapture.updateCaptureConfig(captureForm.value))
+    appStore.showSuccess(t('admin.backup.conversationCapture.saved'))
+    await Promise.all([loadCaptureConfig(), loadCaptureRuntime()])
+  } catch (error) {
+    if (isStepUpCancelled(error)) {
+      savingCapture.value = false
+      return
+    }
+    if (!reportStepUpBlocked(error)) {
+      appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
+    }
+  } finally {
+    savingCapture.value = false
+  }
+}
+
+async function testCapture() {
+  testingCapture.value = true
+  try {
+    await adminAPI.conversationCapture.testCaptureConnection(captureForm.value)
+    appStore.showSuccess(t('admin.backup.s3.testSuccess'))
+  } catch (error) {
+    appStore.showError((error as { message?: string })?.message || t('admin.backup.s3.testFailed'))
+  } finally {
+    testingCapture.value = false
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '-'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`
+}
+
 async function testS3() {
   testingS3.value = true
   try {
@@ -851,7 +1103,14 @@ function formatDate(value?: string): string {
 
 onMounted(async () => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  await Promise.all([loadS3Config(), loadImageStorageConfig(), loadSchedule(), loadBackups()])
+  await Promise.all([
+    loadS3Config(),
+    loadImageStorageConfig(),
+    loadCaptureConfig(),
+    loadCaptureRuntime(),
+    loadSchedule(),
+    loadBackups(),
+  ])
 
   // 如果有正在 running 的备份，恢复轮询
   const runningBackup = backups.value.find(r => r.status === 'running')

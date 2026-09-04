@@ -611,6 +611,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/conversation-capture',
+    name: 'AdminConversationCapture',
+    component: () => import('@/views/admin/ConversationCaptureView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Conversation Capture',
+      titleKey: 'admin.conversationCapture.title',
+      descriptionKey: 'admin.conversationCapture.description'
+    }
+  },
+  {
     path: '/admin/prompt-audit',
     name: 'AdminPromptAudit',
     component: () => import('@/features/prompt-audit/PromptAuditView.vue'),

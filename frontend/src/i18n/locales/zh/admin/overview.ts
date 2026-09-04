@@ -115,6 +115,37 @@ export default {
         presignExpiryHours: '预签名链接有效期（小时）',
         saved: '异步生图对象存储配置已保存'
       },
+      conversationCapture: {
+        title: '会话数据留存',
+        description: '开启后把网关的用户输入与模型输出归一化后落到本地 spool，滚动压缩成 gzip JSONL 并异步上传对象存储；PostgreSQL 只保留检索元数据与输入预览。捕获是纯旁路，任何异常只降级、不影响网关请求。',
+        enabled: '启用会话数据留存',
+        reuseBackupS3: '复用上方备份的 S3 配置（只用不同的存储桶/前缀）',
+        bucket: '存储桶',
+        prefix: 'Key 前缀',
+        previewBytes: '输入预览长度（字节）',
+        previewBytesHint: '写入 PostgreSQL 的用户输入前缀，默认 1KB，上限 2KB',
+        indexRetentionDays: '索引保留天数',
+        indexRetentionDaysHint: '超期索引行每 6 小时清理一次；对象存储中的全文不受影响',
+        spoolMaxGiB: '本地 spool 上限（GiB）',
+        spoolMaxGiBHint: '总量触顶后停止写盘，只写索引，防止日志占满磁盘',
+        queueCapacity: '内存队列容量（条）',
+        queueCapacityHint: '队列满时直接丢弃并计数，绝不阻塞网关请求',
+        diskMinFreeGiB: '磁盘余量下限（GiB）',
+        diskMinFreeGiBHint: '低于此水位停止写盘，只保留 PostgreSQL 索引',
+        diskCriticalFreeGiB: '磁盘余量告急线（GiB）',
+        diskCriticalFreeGiBHint: '低于此水位完全停止捕获，优先保住主服务与数据库',
+        sampleRate: '采样率',
+        sampleRateHint: '1 表示全量捕获；0.1 表示随机保留 10% 的请求',
+        saved: '会话数据留存配置已保存',
+        runtime: {
+          queue: '队列深度',
+          dropped: '累计丢弃',
+          spool: 'spool 占用',
+          pendingUploads: '待上传段',
+          degraded: '当前处于降级状态（{reason}），正文暂不落盘',
+          localOnly: '对象存储未配置或不可用，数据段暂存本地'
+        }
+      },
       schedule: {
         title: '定时备份',
         description: '配置自动定时备份',

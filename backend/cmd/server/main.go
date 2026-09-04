@@ -167,6 +167,12 @@ func runMainServer() {
 			log.Printf("Prompt Audit started in degraded state: %v", err)
 		}
 	}
+	if app.ConversationCapture != nil {
+		// 会话数据留存是纯旁路能力：起不来只降级为不捕获，绝不阻断服务启动。
+		if err := app.ConversationCapture.Start(context.Background()); err != nil {
+			log.Printf("Conversation capture started in degraded state: %v", err)
+		}
+	}
 
 	// 启动服务器
 	go func() {

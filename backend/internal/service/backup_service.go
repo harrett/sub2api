@@ -356,6 +356,13 @@ func (s *BackupService) GetS3Config(ctx context.Context) (*BackupS3Config, error
 	return cfg, nil
 }
 
+// ResolveS3Credentials 返回已解密的备份 S3 配置，供复用同一套凭证的功能
+// （异步生图、会话数据留存）在自己的包里构建客户端。与 GetS3Config 的区别是
+// 它不脱敏——调用方必须只用于建立连接，不得回传给前端。
+func (s *BackupService) ResolveS3Credentials(ctx context.Context) (*BackupS3Config, error) {
+	return s.loadS3Config(ctx)
+}
+
 func (s *BackupService) UpdateS3Config(ctx context.Context, cfg BackupS3Config) (*BackupS3Config, error) {
 	// 如果没提供 secret，保留原有值
 	if cfg.SecretAccessKey == "" {

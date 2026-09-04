@@ -125,6 +125,9 @@ func RegisterAdminRoutes(
 		// 独立提示词输入审计
 		registerPromptAuditRoutes(admin, h)
 
+		// 会话数据留存与 Beta 风控搜索
+		registerConversationCaptureRoutes(admin, h, stepUpAuth)
+
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
 
@@ -146,6 +149,20 @@ func registerPromptAuditRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		promptAudit.POST("/events/batch-delete", h.Admin.PromptAudit.BatchDelete)
 		promptAudit.POST("/events/delete-preview", h.Admin.PromptAudit.DeletePreview)
 		promptAudit.POST("/events/delete-by-filter", h.Admin.PromptAudit.DeleteByFilter)
+	}
+}
+
+// registerConversationCaptureRoutes 注册会话数据留存的配置与 Beta 风控搜索接口。
+// 配置里含对象存储密钥，写入走 step-up 二次校验，与备份 S3 配置保持同一安全等级。
+func registerConversationCaptureRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
+	capture := admin.Group("/conversation-capture")
+	{
+		capture.GET("/config", h.Admin.ConversationCapture.GetConfig)
+		capture.PUT("/config", gin.HandlerFunc(stepUpAuth), h.Admin.ConversationCapture.UpdateConfig)
+		capture.POST("/config/test", h.Admin.ConversationCapture.TestConnection)
+		capture.GET("/runtime", h.Admin.ConversationCapture.GetRuntime)
+		capture.GET("/records", h.Admin.ConversationCapture.SearchRecords)
+		capture.GET("/records/:request_id/full", h.Admin.ConversationCapture.GetFullRecord)
 	}
 }
 

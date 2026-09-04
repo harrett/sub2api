@@ -115,6 +115,37 @@ export default {
         presignExpiryHours: 'Presigned link TTL (hours)',
         saved: 'Async image object storage saved'
       },
+      conversationCapture: {
+        title: 'Conversation Capture',
+        description: 'Normalizes gateway prompts and model outputs into a local spool, rotates them into gzip JSONL and uploads asynchronously to object storage. PostgreSQL keeps only search metadata and an input preview. Capture is strictly side-band: failures degrade, they never affect gateway requests.',
+        enabled: 'Enable conversation capture',
+        reuseBackupS3: 'Reuse the backup S3 configuration above (different bucket/prefix only)',
+        bucket: 'Bucket',
+        prefix: 'Key prefix',
+        previewBytes: 'Input preview size (bytes)',
+        previewBytesHint: 'Prefix of the user input stored in PostgreSQL. Default 1KB, capped at 2KB.',
+        indexRetentionDays: 'Index retention (days)',
+        indexRetentionDaysHint: 'Expired index rows are purged every 6 hours. Full records in object storage are untouched.',
+        spoolMaxGiB: 'Local spool limit (GiB)',
+        spoolMaxGiBHint: 'Once the spool is full, writes stop and only the index is kept, so logs cannot fill the disk.',
+        queueCapacity: 'In-memory queue capacity (records)',
+        queueCapacityHint: 'A full queue drops records and counts them. It never blocks gateway requests.',
+        diskMinFreeGiB: 'Minimum free disk (GiB)',
+        diskMinFreeGiBHint: 'Below this watermark spooling stops and only PostgreSQL index rows are written.',
+        diskCriticalFreeGiB: 'Critical free disk (GiB)',
+        diskCriticalFreeGiBHint: 'Below this watermark capture stops entirely to protect the gateway and database.',
+        sampleRate: 'Sample rate',
+        sampleRateHint: '1 captures everything; 0.1 keeps a random 10% of requests.',
+        saved: 'Conversation capture settings saved',
+        runtime: {
+          queue: 'Queue depth',
+          dropped: 'Dropped total',
+          spool: 'Spool usage',
+          pendingUploads: 'Pending uploads',
+          degraded: 'Degraded ({reason}); full records are not being written',
+          localOnly: 'Object storage is not configured or unreachable; segments stay on local disk'
+        }
+      },
       schedule: {
         title: 'Scheduled Backup',
         description: 'Configure automatic scheduled backups',
