@@ -71,6 +71,14 @@ export default {
     unknownError: 'Unknown error occurred',
     saving: 'Saving...',
     selectedCount: '({count} selected)',
+    groupSelector: {
+      hiddenBadge: '{count} hidden',
+      hiddenHint: 'These groups are bound but not shown above; they are kept on save. Uncheck to unbind:',
+      reasonPlatformMismatch: 'Platform mismatch ({platform})',
+      reasonInactive: 'Group disabled',
+      reasonUnknown: 'Group deleted or not visible',
+      unknownGroupName: 'Group #{id}',
+    },
     refresh: 'Refresh',
     autoRefresh: {
       title: 'Auto Refresh',

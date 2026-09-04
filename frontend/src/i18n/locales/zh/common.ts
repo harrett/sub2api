@@ -71,6 +71,14 @@ export default {
     unknownError: '发生未知错误',
     saving: '保存中...',
     selectedCount: '（已选 {count} 个）',
+    groupSelector: {
+      hiddenBadge: '{count} 个不可见',
+      hiddenHint: '以下分组已绑定但未出现在上方列表中，保存时仍会保留。取消勾选即可解绑：',
+      reasonPlatformMismatch: '平台不匹配（{platform}）',
+      reasonInactive: '分组已停用',
+      reasonUnknown: '分组已删除或不可见',
+      unknownGroupName: '分组 #{id}',
+    },
     refresh: '刷新',
     autoRefresh: {
       title: '自动刷新',
