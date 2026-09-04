@@ -418,21 +418,22 @@ func (c *channelCache) matchWildcardMapping(groupID int64, platform, modelLower 
 
 // lookupPricingAcrossPlatforms 在分组平台内查找模型定价。
 // 各平台严格独立，只在本平台内查找（先精确匹配，再通配符）。
-func lookupPricingAcrossPlatforms(cache *channelCache, groupID int64, groupPlatform, modelLower string) *ChannelModelPricing {
+// 第二个返回值表示命中来自通配模式而非精确配置。
+func lookupPricingAcrossPlatforms(cache *channelCache, groupID int64, groupPlatform, modelLower string) (*ChannelModelPricing, bool) {
 	modelLower = normalizeChannelPricingModelName(modelLower)
 	for _, p := range matchingPlatforms(groupPlatform) {
 		key := channelModelKey{groupID: groupID, platform: p, model: modelLower}
 		if pricing, ok := cache.pricingByGroupModel[key]; ok {
-			return pricing
+			return pricing, false
 		}
 	}
 	// 精确查找全部失败，依次尝试通配符匹配
 	for _, p := range matchingPlatforms(groupPlatform) {
 		if pricing := cache.matchWildcard(groupID, p, modelLower); pricing != nil {
-			return pricing
+			return pricing, true
 		}
 	}
-	return nil
+	return nil, false
 }
 
 // lookupMappingAcrossPlatforms 在分组平台内查找模型映射。
@@ -504,23 +505,31 @@ func (s *ChannelService) lookupGroupChannel(ctx context.Context, groupID int64) 
 // GetChannelModelPricing 获取指定分组+模型的渠道定价（热路径 O(1)）。
 // 各平台严格独立，只在本平台内查找定价。
 func (s *ChannelService) GetChannelModelPricing(ctx context.Context, groupID int64, model string) *ChannelModelPricing {
+	pricing, _ := s.GetChannelModelPricingMatch(ctx, groupID, model)
+	return pricing
+}
+
+// GetChannelModelPricingMatch 与 GetChannelModelPricing 相同，额外返回该价卡是否
+// 由通配模式（如 gpt-*）命中，而非管理员针对该模型的精确配置。计费侧据此区分
+// "管理员显式为这个模型定了 token 价" 与 "这个模型碰巧落进了某张通配价卡"。
+func (s *ChannelService) GetChannelModelPricingMatch(ctx context.Context, groupID int64, model string) (*ChannelModelPricing, bool) {
 	lk, err := s.lookupGroupChannel(ctx, groupID)
 	if err != nil {
 		slog.Warn("failed to load channel cache", "group_id", groupID, "error", err)
-		return nil
+		return nil, false
 	}
 	if lk == nil {
-		return nil
+		return nil, false
 	}
 
 	modelLower := strings.ToLower(model)
-	pricing := lookupPricingAcrossPlatforms(lk.cache, groupID, lk.platform, modelLower)
+	pricing, wildcard := lookupPricingAcrossPlatforms(lk.cache, groupID, lk.platform, modelLower)
 	if pricing == nil {
-		return nil
+		return nil, false
 	}
 
 	cp := pricing.Clone()
-	return &cp
+	return &cp, wildcard
 }
 
 // ResolveChannelMapping 解析渠道级模型映射（热路径 O(1)）
@@ -592,7 +601,7 @@ func checkRestricted(lk *channelLookup, groupID int64, model string) bool {
 	}
 	modelLower := strings.ToLower(model)
 	// 使用与查找定价相同的跨平台逻辑
-	if lookupPricingAcrossPlatforms(lk.cache, groupID, lk.platform, modelLower) != nil {
+	if pricing, _ := lookupPricingAcrossPlatforms(lk.cache, groupID, lk.platform, modelLower); pricing != nil {
 		return false
 	}
 	return true

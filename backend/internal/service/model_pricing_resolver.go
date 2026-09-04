@@ -34,6 +34,10 @@ type ResolvedPricing struct {
 	// 来源标识
 	Source string // "channel", "litellm", "fallback"
 
+	// WildcardMatch 表示 group/channel 价卡是靠通配模式（如 gpt-*）命中的，
+	// 而非管理员针对该模型名的精确配置。
+	WildcardMatch bool
+
 	// 是否支持缓存细分
 	SupportsCacheBreakdown bool
 
@@ -70,7 +74,7 @@ type PricingInput struct {
 // 2. 如果指定了 GroupID，查找渠道定价并覆盖
 func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) *ResolvedPricing {
 	longContextPricingEnabled := input.Group == nil || input.Group.LongContextPricingEnabled
-	if groupPricing := matchGroupModelPricing(input.Group, input.Model); groupPricing != nil {
+	if groupPricing, groupWildcard := matchGroupModelPricing(input.Group, input.Model); groupPricing != nil {
 		// Group token cards only override the first-tier / flat rates.
 		// Long-context ladders come from official presets, gated by the checkbox.
 		if groupPricing.BillingMode == "" || groupPricing.BillingMode == BillingModeToken {
@@ -80,12 +84,14 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 		}
 		resolved := r.resolveConfiguredPricing(groupPricing, input.Model, PricingSourceGroup)
 		resolved.longContextPricingEnabled = longContextPricingEnabled
+		resolved.WildcardMatch = groupWildcard
 		return resolved
 	}
 
 	var chPricing *ChannelModelPricing
+	var chWildcard bool
 	if input.GroupID != nil && r.channelService != nil {
-		chPricing = r.lookupChannelPricingNormalized(ctx, *input.GroupID, input.Model)
+		chPricing, chWildcard = r.lookupChannelPricingNormalized(ctx, *input.GroupID, input.Model)
 		if chPricing != nil {
 			mode := chPricing.BillingMode
 			if mode == "" {
@@ -96,6 +102,7 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 					Mode:           mode,
 					Source:         PricingSourceChannel,
 					channelPricing: chPricing,
+					WildcardMatch:  chWildcard,
 				}
 				resolved.longContextPricingEnabled = longContextPricingEnabled
 				r.applyRequestTierOverrides(chPricing, resolved)
@@ -119,6 +126,7 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 	if chPricing != nil {
 		resolved.Source = PricingSourceChannel
 		resolved.channelPricing = chPricing
+		resolved.WildcardMatch = chWildcard
 		r.applyTokenOverrides(chPricing, resolved)
 	} else if input.GroupID != nil && r.channelService != nil {
 		r.applyChannelOverrides(ctx, *input.GroupID, input.Model, resolved)
@@ -143,9 +151,10 @@ func (r *ModelPricingResolver) resolveConfiguredPricing(config *ChannelModelPric
 	return resolved
 }
 
-func matchGroupModelPricing(group *Group, model string) *ChannelModelPricing {
+// matchGroupModelPricing 返回命中的分组价卡，第二个返回值表示命中来自通配模式。
+func matchGroupModelPricing(group *Group, model string) (*ChannelModelPricing, bool) {
 	if group == nil {
-		return nil
+		return nil, false
 	}
 	model = normalizeChannelPricingModelName(model)
 	var wildcard *ChannelModelPricing
@@ -155,7 +164,7 @@ func matchGroupModelPricing(group *Group, model string) *ChannelModelPricing {
 			normalized := normalizeChannelPricingModelName(pattern)
 			if normalized == model {
 				cp := entry.Clone()
-				return &cp
+				return &cp, false
 			}
 			if strings.HasSuffix(normalized, "*") && strings.HasPrefix(model, strings.TrimSuffix(normalized, "*")) && wildcard == nil {
 				cp := entry.Clone()
@@ -163,7 +172,7 @@ func matchGroupModelPricing(group *Group, model string) *ChannelModelPricing {
 			}
 		}
 	}
-	return wildcard
+	return wildcard, wildcard != nil
 }
 
 // resolveBasePricing 从 LiteLLM 或 Fallback 获取基础定价
@@ -187,29 +196,30 @@ func (r *ModelPricingResolver) resolveBasePricing(model string) (*ModelPricing, 
 //
 // 字面名优先，保证管理员对具体变体的显式配价不被基名覆盖；非 OpenAI 模型
 // normalizeKnownOpenAICodexModel 返回空串，此处天然 no-op。
-func (r *ModelPricingResolver) lookupChannelPricingNormalized(ctx context.Context, groupID int64, model string) *ChannelModelPricing {
+func (r *ModelPricingResolver) lookupChannelPricingNormalized(ctx context.Context, groupID int64, model string) (*ChannelModelPricing, bool) {
 	if r.channelService == nil {
-		return nil
+		return nil, false
 	}
-	if pricing := r.channelService.GetChannelModelPricing(ctx, groupID, model); pricing != nil {
-		return pricing
+	if pricing, wildcard := r.channelService.GetChannelModelPricingMatch(ctx, groupID, model); pricing != nil {
+		return pricing, wildcard
 	}
 	normalized := normalizeKnownOpenAICodexModel(model)
 	if normalized == "" || strings.EqualFold(normalized, strings.TrimSpace(model)) {
-		return nil
+		return nil, false
 	}
-	return r.channelService.GetChannelModelPricing(ctx, groupID, normalized)
+	return r.channelService.GetChannelModelPricingMatch(ctx, groupID, normalized)
 }
 
 // applyChannelOverrides 应用渠道定价覆盖
 func (r *ModelPricingResolver) applyChannelOverrides(ctx context.Context, groupID int64, model string, resolved *ResolvedPricing) {
-	chPricing := r.lookupChannelPricingNormalized(ctx, groupID, model)
+	chPricing, wildcard := r.lookupChannelPricingNormalized(ctx, groupID, model)
 	if chPricing == nil {
 		return
 	}
 
 	resolved.Source = PricingSourceChannel
 	resolved.channelPricing = chPricing
+	resolved.WildcardMatch = wildcard
 	resolved.Mode = chPricing.BillingMode
 	if resolved.Mode == "" {
 		resolved.Mode = BillingModeToken
@@ -377,6 +387,53 @@ func intervalToModelPricing(iv *PricingInterval, base *ModelPricing, chPricing *
 		applyChannelImageInputPrice(chPricing, pricing)
 	}
 	return pricing
+}
+
+// channelPricingConfiguresPrice 判定一张价卡是否真的配了价，而不是一张只用来
+// 声明"本渠道支持这些模型"的空壳卡。渠道编辑页把模型清单和价格放在同一张卡里，
+// 价格全部留空是常态；这种卡不携带任何管理员的计费意图。
+func channelPricingConfiguresPrice(cp *ChannelModelPricing) bool {
+	if cp == nil {
+		return false
+	}
+	if cp.InputPrice != nil || cp.OutputPrice != nil ||
+		cp.CacheWritePrice != nil || cp.CacheWrite1hPrice != nil || cp.CacheReadPrice != nil ||
+		cp.ImageInputPrice != nil || cp.ImageOutputPrice != nil || cp.PerRequestPrice != nil ||
+		cp.FastMultiplier != nil || cp.FlexMultiplier != nil {
+		return true
+	}
+	if cp.TimePricing != nil && len(cp.TimePricing.Periods) > 0 {
+		return true
+	}
+	return len(filterValidIntervals(cp.Intervals)) > 0
+}
+
+// mediaTokenBillingExplicit 判定一次图片/视频请求能否被切回 token 计费。
+//
+// 只有管理员为该模型**精确且带价**配置的 token 价卡才算数：
+//
+//   - 通配价卡（gpt-*、claude-* 乃至 *）是给文本模型配的，命中 gpt-image-2 这类
+//     生图模型属于误伤；
+//   - 价格全空的卡只是渠道模型清单，不是计费声明。
+//
+// 两种情况的后果都是单向亏损：applyTokenOverrides 把 ImageInputPricePerToken /
+// ImageOutputPricePerToken 一并归零（"渠道定价覆盖一切，未配置则归零"），于是整张图
+// 只按文本输入价收几厘钱，而上游是按张计费的。分组显式配置的生图独立倍率也会被一并绕过。
+func mediaTokenBillingExplicit(resolved *ResolvedPricing) bool {
+	if resolved == nil || resolved.Mode != BillingModeToken || resolved.WildcardMatch {
+		return false
+	}
+	return channelPricingConfiguresPrice(resolved.channelPricing)
+}
+
+// imageTokenBillingExplicit 在 mediaTokenBillingExplicit 之上再要求价卡显式配置了
+// 图片输出单价。按 token 给生图计费而不配图片输出价，等于把出图那部分白送
+// （ImageOutputPriceExplicit 会强制归零），而上游按张收费——这只可能是配置疏漏。
+func imageTokenBillingExplicit(resolved *ResolvedPricing) bool {
+	if !mediaTokenBillingExplicit(resolved) {
+		return false
+	}
+	return resolved.channelPricing.ImageOutputPrice != nil
 }
 
 // GetRequestTierPrice 根据层级标签获取按次价格
