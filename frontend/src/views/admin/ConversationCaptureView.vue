@@ -106,9 +106,24 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-            <tr v-for="record in records" :key="record.id" class="align-top">
+            <tr
+              v-for="record in records"
+              :key="record.id"
+              class="align-top transition-colors"
+              :class="
+                isViewed(record)
+                  ? 'bg-gray-100/70 text-gray-400 dark:bg-gray-800/70 dark:text-gray-500'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'
+              "
+            >
               <td class="whitespace-nowrap px-4 py-2 text-xs text-gray-600 dark:text-gray-400">
                 {{ formatTime(record.created_at) }}
+                <span
+                  v-if="isViewed(record)"
+                  class="mt-1 block w-fit rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                >
+                  {{ t('admin.conversationCapture.table.viewed') }}
+                </span>
               </td>
               <td class="whitespace-nowrap px-4 py-2">
                 <div class="text-gray-900 dark:text-gray-100">{{ record.user_email || '-' }}</div>
@@ -155,11 +170,36 @@
       @click.self="fullRecordOpen = false"
     >
       <div class="flex max-h-[85vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl dark:bg-gray-900">
-        <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-          <h4 class="font-semibold text-gray-900 dark:text-white">
-            {{ t('admin.conversationCapture.full.title') }}
-          </h4>
-          <button type="button" class="btn btn-secondary btn-xs" @click="fullRecordOpen = false">
+        <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+          <div class="min-w-0">
+            <h4 class="font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.conversationCapture.full.title') }}
+            </h4>
+            <!-- 正文很长，滚动几屏后很容易忘了这个弹窗是从哪一行点开的。
+                 身份信息常驻标题栏，随时能对上是谁。 -->
+            <dl v-if="fullRecordTarget" class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              <div class="flex gap-1">
+                <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.user') }}</dt>
+                <dd class="font-medium text-gray-900 dark:text-gray-100">
+                  {{ fullRecordTarget.user_email || '-' }}
+                  <span class="font-normal text-gray-500 dark:text-gray-400">#{{ fullRecordTarget.user_id ?? '-' }}</span>
+                </dd>
+              </div>
+              <div class="flex gap-1">
+                <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.group') }}</dt>
+                <dd class="font-medium text-gray-900 dark:text-gray-100">{{ fullRecordTarget.group_name || '-' }}</dd>
+              </div>
+              <div class="flex gap-1">
+                <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.platform') }}</dt>
+                <dd class="font-medium text-gray-900 dark:text-gray-100">{{ fullRecordTarget.platform || '-' }}</dd>
+              </div>
+              <div class="flex min-w-0 gap-1">
+                <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.requestId') }}</dt>
+                <dd class="truncate font-mono text-gray-700 dark:text-gray-300">{{ fullRecordTarget.request_id }}</dd>
+              </div>
+            </dl>
+          </div>
+          <button type="button" class="btn btn-secondary btn-xs shrink-0" @click="fullRecordOpen = false">
             {{ t('common.close') }}
           </button>
         </div>
@@ -201,6 +241,38 @@ const banningUserId = ref<number | null>(null)
 const fullRecordOpen = ref(false)
 const fullRecordLoading = ref(false)
 const fullRecordText = ref('')
+const fullRecordTarget = ref<ConversationCaptureRecord | null>(null)
+
+// 已查看标记跨刷新保留：审计时经常翻到一半刷新页面，丢了标记就得从头重看。
+// 上限防止 localStorage 无限增长。
+const VIEWED_STORAGE_KEY = 'convlog:viewed-request-ids'
+const VIEWED_LIMIT = 500
+const viewedRequestIds = ref<string[]>(loadViewedIds())
+
+function loadViewedIds(): string[] {
+  try {
+    const raw = window.localStorage.getItem(VIEWED_STORAGE_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function isViewed(record: ConversationCaptureRecord): boolean {
+  return viewedRequestIds.value.includes(record.request_id)
+}
+
+function markViewed(requestId: string): void {
+  if (!requestId || viewedRequestIds.value.includes(requestId)) return
+  const next = [...viewedRequestIds.value, requestId].slice(-VIEWED_LIMIT)
+  viewedRequestIds.value = next
+  try {
+    window.localStorage.setItem(VIEWED_STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // 存储被禁用或写满时只丢标记，不影响检索。
+  }
+}
 
 const filters = reactive({
   accountId: 0,
@@ -285,6 +357,9 @@ async function openFull(record: ConversationCaptureRecord): Promise<void> {
   fullRecordOpen.value = true
   fullRecordLoading.value = true
   fullRecordText.value = ''
+  fullRecordTarget.value = record
+  // 点开即标记：读到一半关掉也算看过，重点是知道扫到哪一行了。
+  markViewed(record.request_id)
   try {
     const result = await adminAPI.conversationCapture.getCaptureRecordFull(record.request_id)
     fullRecordText.value = JSON.stringify(result.record, null, 2)

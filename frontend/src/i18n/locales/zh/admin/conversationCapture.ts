@@ -33,6 +33,7 @@ export default {
       noPreview: '（无文本输入）',
       actions: '操作',
       viewFull: '查看全文',
+      viewed: '已查看',
       noFullText: '该记录写入时磁盘保护生效，全文未落盘',
       banUser: '封禁用户',
       banConfirm: '确认封禁用户 {email}？该用户的 API Key 将立即停止服务。',
@@ -40,6 +41,10 @@ export default {
     },
     full: {
       title: '完整会话记录',
+      user: '用户',
+      group: '分组',
+      platform: '平台',
+      requestId: '请求 ID',
     },
   },
 }

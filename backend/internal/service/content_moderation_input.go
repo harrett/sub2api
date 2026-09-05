@@ -310,6 +310,12 @@ func isCodexAmbientSuggestionPolicyText(text string) bool {
 	return strings.Contains(text, codexAmbientSuggestionPolicyMarker)
 }
 
+// IsInjectedPlatformPrompt 判断一段文本是平台自身注入的上下文而非终端用户输入。
+// 会话数据留存的预览提取复用它，避免同一份特征串在两个包里各写一遍而后漂移。
+func IsInjectedPlatformPrompt(text string) bool {
+	return isCodexAmbientSuggestionPolicyText(text)
+}
+
 func addModerationText(parts *[]string, text string) {
 	text = strings.TrimSpace(text)
 	if text == "" {

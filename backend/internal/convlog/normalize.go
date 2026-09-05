@@ -38,28 +38,136 @@ func DetectProtocol(endpoint string, body []byte) string {
 	return ProtocolUnknown
 }
 
-// moderationProtocol 把本包的协议标识映射到内容审核模块的标识，以便复用其
-// "取最后一条用户输入"的提取器（含 system-reminder 过滤）。
-func moderationProtocol(protocol string) string {
+// ExtractPreview 返回用于风控检索的用户输入预览，按 UTF-8 边界截断到 limit 字节。
+//
+// 不能复用内容审核的提取器：那套逻辑只看 messages/input 的**最后一个元素**，
+// 因为审核关心"用户刚发出的这一句"。风控关心的是"用户到底打了什么字"，而
+// agent 流量（Codex/Claude Code）的最后一个元素通常是 function_call_output 或
+// tool_result，按审核语义取会得到空串——这正是列表里出现"（无文本输入）"而
+// 全文里明明有用户输入的原因。这里改成从后往前找最近一条**真正的用户文本**。
+func ExtractPreview(protocol string, body []byte, limit int) string {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+	return truncateUTF8(lastUserText(protocol, body), limit)
+}
+
+func lastUserText(protocol string, body []byte) string {
 	switch protocol {
-	case ProtocolAnthropicMessages:
-		return service.ContentModerationProtocolAnthropicMessages
-	case ProtocolOpenAIChat:
-		return service.ContentModerationProtocolOpenAIChat
+	case ProtocolAnthropicMessages, ProtocolOpenAIChat:
+		return lastUserTextFromMessages(gjson.GetBytes(body, "messages"))
 	case ProtocolOpenAIResponses:
-		return service.ContentModerationProtocolOpenAIResponses
+		return lastUserTextFromResponsesInput(gjson.GetBytes(body, "input"))
 	case ProtocolGeminiGenerate:
-		return service.ContentModerationProtocolGemini
+		return lastUserTextFromGeminiContents(gjson.GetBytes(body, "contents"))
+	default:
+		// 协议识别失败时挨个试，任何一个能取到就用它。
+		for _, candidate := range []string{
+			lastUserTextFromResponsesInput(gjson.GetBytes(body, "input")),
+			lastUserTextFromMessages(gjson.GetBytes(body, "messages")),
+			lastUserTextFromGeminiContents(gjson.GetBytes(body, "contents")),
+		} {
+			if candidate != "" {
+				return candidate
+			}
+		}
+		return ""
+	}
+}
+
+func lastUserTextFromMessages(messages gjson.Result) string {
+	return scanBackwards(messages, func(item gjson.Result) string {
+		if !isUserRole(item.Get("role").String()) {
+			return ""
+		}
+		return userTextFromContent(item.Get("content"))
+	})
+}
+
+func lastUserTextFromResponsesInput(input gjson.Result) string {
+	if input.Type == gjson.String {
+		return sanitizeUserText(input.String())
+	}
+	return scanBackwards(input, func(item gjson.Result) string {
+		if !isUserRole(item.Get("role").String()) {
+			return ""
+		}
+		if text := userTextFromContent(item.Get("content")); text != "" {
+			return text
+		}
+		// Responses 的 input 项也可能直接是 {"type":"input_text","text":...}
+		return sanitizeUserText(item.Get("text").String())
+	})
+}
+
+func lastUserTextFromGeminiContents(contents gjson.Result) string {
+	return scanBackwards(contents, func(item gjson.Result) string {
+		role := strings.ToLower(strings.TrimSpace(item.Get("role").String()))
+		if role != "" && role != "user" {
+			return ""
+		}
+		return sanitizeUserText(flattenGeminiParts(item.Get("parts")))
+	})
+}
+
+// scanBackwards 从数组末尾往前找第一个能提取出文本的元素。
+func scanBackwards(array gjson.Result, extract func(gjson.Result) string) string {
+	if !array.IsArray() {
+		return ""
+	}
+	items := array.Array()
+	for i := len(items) - 1; i >= 0; i-- {
+		if text := extract(items[i]); text != "" {
+			return text
+		}
+	}
+	return ""
+}
+
+// isUserRole 把 Responses 的 message 项与 chat 的 user 消息统一看待。
+func isUserRole(role string) bool {
+	return strings.EqualFold(strings.TrimSpace(role), "user")
+}
+
+// userTextFromContent 从 content（字符串或块数组）里取出纯文本，
+// 忽略 tool_result / image 这类非用户输入的块。
+func userTextFromContent(content gjson.Result) string {
+	switch {
+	case !content.Exists():
+		return ""
+	case content.Type == gjson.String:
+		return sanitizeUserText(content.String())
+	case content.IsArray():
+		var parts []string
+		content.ForEach(func(_, block gjson.Result) bool {
+			switch strings.ToLower(strings.TrimSpace(block.Get("type").String())) {
+			case "", "text", "input_text":
+				if text := sanitizeUserText(block.Get("text").String()); text != "" {
+					parts = append(parts, text)
+				}
+			}
+			return true
+		})
+		return strings.Join(parts, "\n")
+	case content.IsObject():
+		return sanitizeUserText(content.Get("text").String())
 	default:
 		return ""
 	}
 }
 
-// ExtractPreview 返回用于风控检索的用户输入预览：最后一条用户消息的文本，
-// 按 UTF-8 边界截断到 limit 字节。
-func ExtractPreview(protocol string, body []byte, limit int) string {
-	text := service.ExtractContentModerationText(moderationProtocol(protocol), body)
-	return truncateUTF8(text, limit)
+// sanitizeUserText 丢掉平台自己注入的上下文块，只留真正的用户输入。
+// 注入内容（system-reminder、Codex 安全策略文档）出现在预览里会把风控人员
+// 引向错误结论——他们会以为这些话是用户说的。
+func sanitizeUserText(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	if strings.Contains(text, "<system-reminder>") || service.IsInjectedPlatformPrompt(text) {
+		return ""
+	}
+	return strings.Join(strings.Fields(text), " ")
 }
 
 // NormalizeRequest 把客户端请求体解析成统一的对话视图。

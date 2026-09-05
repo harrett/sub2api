@@ -33,6 +33,7 @@ export default {
       noPreview: '(no text input)',
       actions: 'Actions',
       viewFull: 'View full',
+      viewed: 'Viewed',
       noFullText: 'Disk protection was active when this row was written; the full record was not persisted',
       banUser: 'Ban user',
       banConfirm: 'Ban user {email}? Their API keys stop working immediately.',
@@ -40,6 +41,10 @@ export default {
     },
     full: {
       title: 'Full conversation record',
+      user: 'User',
+      group: 'Group',
+      platform: 'Platform',
+      requestId: 'Request ID',
     },
   },
 }
