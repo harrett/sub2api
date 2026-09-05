@@ -32,7 +32,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/gatewayerr"
 )
 
-// 责任方指引的查表键。upstream 的返回值不带错误码，只能从 error 类型反推。
+// 责任方指引的查表键。upstream 的错误码（gateway_concurrency_limit）不区分
+// user / account 槽位，而这里的分流恰恰取决于槽位，因此仍从 error 类型反推。
 const (
 	userConcurrencyGuidanceCode      = "USER_CONCURRENCY_EXCEEDED"
 	accountConcurrencyGuidanceCode   = "ACCOUNT_CONCURRENCY_EXCEEDED"
@@ -45,16 +46,17 @@ const (
 )
 
 // concurrencyErrorResponse 是全部调用点使用的入口，签名与 upstream 一致。
-func concurrencyErrorResponse(err error, slotType string) (int, string, string) {
-	status, errType, message := upstreamConcurrencyErrorResponse(err, slotType)
+// upstream 的错误码原样透出，只有 status 与 message 会被指引改写。
+func concurrencyErrorResponse(err error, slotType string) (int, string, string, string) {
+	status, errType, errCode, message := upstreamConcurrencyErrorResponse(err, slotType)
 
 	code := concurrencyGuidanceCode(err, slotType)
 	if code == "" {
 		// 客户端已断开（499），补文案没有意义，也不该改状态码。
-		return status, errType, message
+		return status, errType, errCode, message
 	}
 	status, message = gatewayerr.PlatformErrorPresentation(code, status, message)
-	return status, errType, message
+	return status, errType, errCode, message
 }
 
 // concurrencyGuidanceCode 按 upstream 的分支顺序反推责任方；返回空串表示不加指引。
