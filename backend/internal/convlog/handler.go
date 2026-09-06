@@ -105,12 +105,13 @@ type searchResponse struct {
 }
 
 type searchEcho struct {
-	AccountID int64     `json:"account_id"`
-	Start     time.Time `json:"start"`
-	End       time.Time `json:"end"`
-	Keyword   string    `json:"keyword,omitempty"`
-	SessionID string    `json:"session_id,omitempty"`
-	Limit     int       `json:"limit"`
+	AccountID    int64     `json:"account_id"`
+	Start        time.Time `json:"start"`
+	End          time.Time `json:"end"`
+	Keyword      string    `json:"keyword,omitempty"`
+	SessionID    string    `json:"session_id,omitempty"`
+	NewTurnsOnly bool      `json:"new_turns_only"`
+	Limit        int       `json:"limit"`
 }
 
 // SearchRecords 是 Beta 风控搜索：必须指定账号池账号与时间范围。
@@ -134,12 +135,13 @@ func (h *AdminHandler) SearchRecords(c *gin.Context) {
 		Records: records,
 		Summary: summary,
 		Filter: searchEcho{
-			AccountID: filter.AccountID,
-			Start:     filter.Start,
-			End:       filter.End,
-			Keyword:   filter.Keyword,
-			SessionID: filter.SessionID,
-			Limit:     filter.Limit,
+			AccountID:    filter.AccountID,
+			Start:        filter.Start,
+			End:          filter.End,
+			Keyword:      filter.Keyword,
+			SessionID:    filter.SessionID,
+			NewTurnsOnly: filter.NewTurnsOnly,
+			Limit:        filter.Limit,
 		},
 	})
 }
@@ -175,7 +177,13 @@ func (h *AdminHandler) settingStore() *SettingStore {
 }
 
 func parseSearchFilter(c *gin.Context) (SearchFilter, error) {
-	filter := SearchFilter{Keyword: c.Query("keyword"), SessionID: c.Query("session_id")}
+	filter := SearchFilter{
+		Keyword:   c.Query("keyword"),
+		SessionID: c.Query("session_id"),
+		// 默认折叠 agent 循环续跑：那些轮次的输入与上一条一字不差，
+		// 铺在列表里只会把真正的新提问淹掉。
+		NewTurnsOnly: c.Query("include_continuation") != "true",
+	}
 
 	accountID, err := strconv.ParseInt(strings.TrimSpace(c.Query("account_id")), 10, 64)
 	if err != nil || accountID <= 0 {

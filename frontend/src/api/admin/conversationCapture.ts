@@ -55,6 +55,10 @@ export interface ConversationCaptureRecord {
   request_id: string
   /** 客户端提供的会话标识；很多客户端不提供，此时为空串 */
   session_id: string
+  /** 同一 session 下的线程标识；Codex 并行子代理靠它区分 */
+  thread_id: string
+  /** 本轮只是 agent 循环续跑，用户没有新提问 */
+  is_continuation: boolean
   created_at: string
   user_id?: number
   api_key_id?: number
@@ -96,6 +100,7 @@ export interface ConversationCaptureSearchResult {
     end: string
     keyword?: string
     session_id?: string
+    new_turns_only: boolean
     limit: number
   }
 }
@@ -108,6 +113,8 @@ export interface ConversationCaptureSearchParams {
   keyword?: string
   /** 按会话精确收敛，用于从一条记录跳到同一会话的其余轮次 */
   session_id?: string
+  /** 默认折叠 agent 续跑轮次；传 true 才连续跑一起返回 */
+  include_continuation?: boolean
   user_id?: number
   limit?: number
 }

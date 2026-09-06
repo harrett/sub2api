@@ -46,6 +46,8 @@ Bedrock / Grok 全部上游，无需在每个 forward 分支里埋点。
   "schema_version": 2,
   "request_id": "req_...",
   "session_id": "01a07589-b523-72a2-a801-f48c22179794",
+  "thread_id": "01a07591-d10c-7702-a39c-6d030ec83faf",
+  "continuation": false,
   "created_at": "2026-09-06T10:00:00Z",
   "duration_ms": 4210,
   "status_code": 200,
@@ -85,10 +87,20 @@ input token 是缓存命中），所以按请求存全量等于单会话 O(n²)�
 只是同一份内容被抄了 N 遍。
 
 **上下文怎么重建**：不在单条记录里。单条只存本轮的 (用户输入, 模型输出)，
-完整会话由 `session_id` 分组、按 `created_at` 排序拼出来；客户端不提供会话标识时
-退化为 `user_id` + 时间窗。蒸馏其实不需要重建——每条记录本身就是一个完整样本。
-`session_id` 优先取请求头（Claude Code / OpenAI 兼容客户端），其次取请求体
-（Codex 的 `prompt_cache_key` 与 `client_metadata.session_id`）。
+线性对话由 `thread_id` 分组、按 `created_at` 排序拼出来；`session_id` 是更粗的一层
+（一个任务），客户端两者都不提供时退化为 `user_id` + 时间窗。蒸馏其实不需要
+重建——每条记录本身就是一个完整样本。
+
+分两层是被数据逼出来的：Codex 并行派发子代理时多个线程共用一个 `session_id`，
+V2 抽样里四条记录 `session_id` 完全相同，其中三条却是三个不同子代理（A/B/C）
+在并行跑，只按 session 排序会把它们串在一起。
+
+**`continuation` 标记**：为真表示本轮只是 agent 循环续跑，用户没有新提问——判据是
+本次请求里最后一条 user 项之后还有 assistant / tool 项。V2 抽样 user114 连续三条
+记录的 input 一字不差，输出分别是「只有 tool_call」「文本+tool_call」「最终答复」；
+三条都合法，但当成三个 (指令, 回答) 样本去蒸馏是错的，风控列表里也是三行重复。
+标记而不丢弃：续跑轮的输出对 agent 轨迹蒸馏有价值，风控也需要看到完整活动。
+风控页默认折叠，蒸馏取指令样本时按此排除。
 
 **为什么取"最后一条"用户输入**：客户端注入的内容（系统提示、压缩检查点、运行时快照、
 技能目录）总是排在真人那句之前，两份生产抽样都如此；取最后一条既能避开注入，又与列表
@@ -100,9 +112,10 @@ input token 是缓存命中），所以按请求存全量等于单会话 O(n²)�
 注入内容有两种形态，处理方式不同：
 - **整条消息就是注入**（DeepSeek 的压缩检查点、运行时快照、Codex 安全策略）：整条丢弃，
   继续往前找上一条。
-- **注入追加在用户消息内部**（抽样 3 的 `<environment_details>`、Claude Code 的
-  `<system-reminder>`）：只挖掉标签块。整条丢会丢掉用户真正打的"进行修复"，
-  整条留会把每轮都变的时间戳写进语料。
+- **注入追加在用户消息内部**（抽样 3 的 `<environment_details>`、AIDE 系的
+  `<workspace_attachment>`、Claude Code 的 `<system-reminder>`）：只挖掉标签块。
+  整条丢会丢掉用户真正打的"进行修复"，整条留会把每轮都变的时间戳与工作区文件树
+  写进语料——`<workspace_attachment>` 在 V2 抽样的一条记录里占了 62% 的"用户输入"。
 
 三份生产抽样实测：
 

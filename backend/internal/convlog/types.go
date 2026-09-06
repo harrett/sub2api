@@ -186,15 +186,20 @@ type Record struct {
 	RequestID     string `json:"request_id"`
 	// SessionID 是客户端提供的会话标识（可能为空）。单条记录只存本轮，
 	// 完整上下文靠同一 SessionID（缺失时退化为同一用户 + 时间窗）的相邻记录重建。
-	SessionID  string    `json:"session_id,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	DurationMs int       `json:"duration_ms"`
-	StatusCode int       `json:"status_code"`
-	Stream     bool      `json:"stream"`
-	Endpoint   string    `json:"endpoint"`
-	Protocol   string    `json:"protocol"`
-	Identity   Identity  `json:"identity"`
-	Model      ModelInfo `json:"model"`
+	SessionID string `json:"session_id,omitempty"`
+	// ThreadID 区分同一 session 下并行的子代理线程；重建线性对话应按它分组。
+	ThreadID string `json:"thread_id,omitempty"`
+	// Continuation 为真表示本轮是 agent 循环续跑，用户没有新提问：Input 与上一条
+	// 相同，Output 回应的是工具结果而不是那句用户输入。取 (指令, 回答) 样本时排除。
+	Continuation bool      `json:"continuation,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	DurationMs   int       `json:"duration_ms"`
+	StatusCode   int       `json:"status_code"`
+	Stream       bool      `json:"stream"`
+	Endpoint     string    `json:"endpoint"`
+	Protocol     string    `json:"protocol"`
+	Identity     Identity  `json:"identity"`
+	Model        ModelInfo `json:"model"`
 
 	Conversation Conversation `json:"conversation"`
 	Usage        Usage        `json:"usage"`
@@ -216,6 +221,7 @@ type IndexRow struct {
 	ID         int64     `json:"id"`
 	RequestID  string    `json:"request_id"`
 	SessionID  string    `json:"session_id"`
+	ThreadID   string    `json:"thread_id"`
 	CreatedAt  time.Time `json:"created_at"`
 	UserID     *int64    `json:"user_id,omitempty"`
 	APIKeyID   *int64    `json:"api_key_id,omitempty"`
@@ -240,6 +246,7 @@ type IndexRow struct {
 	InputTokens  int    `json:"input_tokens"`
 	OutputTokens int    `json:"output_tokens"`
 	ObjectKey    string `json:"object_key"`
+	Continuation bool   `json:"is_continuation"`
 }
 
 // SearchFilter 是 Beta 风控搜索的查询条件。AccountID 与时间范围为必填，
@@ -248,10 +255,12 @@ type SearchFilter struct {
 	AccountID int64
 	UserID    *int64
 	SessionID string
-	Start     time.Time
-	End       time.Time
-	Keyword   string
-	Limit     int
+	// NewTurnsOnly 折叠 agent 循环续跑，只看用户真正新提问的轮次。
+	NewTurnsOnly bool
+	Start        time.Time
+	End          time.Time
+	Keyword      string
+	Limit        int
 }
 
 // RuntimeStats 是后台运行态面板的数据源。

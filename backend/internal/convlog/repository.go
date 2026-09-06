@@ -21,12 +21,12 @@ var (
 
 // 账号名在捕获时拿不到（gin 上下文里只落了 account_id），因此读取时 LEFT JOIN
 // accounts 补齐；快照列留作将来回填，非空时优先用快照，账号被删也仍有历史名字。
-const indexSelect = `c.id, c.request_id, c.session_id, c.created_at, c.user_id, c.api_key_id, c.account_id, c.group_id,
+const indexSelect = `c.id, c.request_id, c.session_id, c.thread_id, c.created_at, c.user_id, c.api_key_id, c.account_id, c.group_id,
 	c.user_email, c.api_key_name,
 	COALESCE(NULLIF(c.account_name, ''), a.name, '') AS account_name,
 	c.group_name, c.platform, c.protocol, c.endpoint, c.model,
 	c.stream, c.status_code, c.duration_ms, c.ip_address, c.input_preview, c.input_bytes,
-	c.output_bytes, c.input_tokens, c.output_tokens, c.object_key`
+	c.output_bytes, c.input_tokens, c.output_tokens, c.object_key, c.is_continuation`
 
 const indexFrom = ` FROM conversation_capture_index c LEFT JOIN accounts a ON a.id = c.account_id`
 
@@ -45,11 +45,11 @@ func (r *Repository) InsertBatch(ctx context.Context, rows []IndexRow) error {
 	}
 
 	// 列顺序必须与下面 args 的追加顺序严格一致。
-	const insertColumns = `request_id, session_id, created_at, user_id, api_key_id, account_id, group_id,
+	const insertColumns = `request_id, session_id, thread_id, is_continuation, created_at, user_id, api_key_id, account_id, group_id,
 		user_email, api_key_name, account_name, group_name, platform, protocol, endpoint, model,
 		stream, status_code, duration_ms, ip_address, input_preview, input_bytes, output_bytes,
 		input_tokens, output_tokens, object_key`
-	const columnCount = 25
+	const columnCount = 27
 
 	placeholders := make([]string, 0, len(rows))
 	args := make([]any, 0, len(rows)*columnCount)
@@ -61,7 +61,7 @@ func (r *Repository) InsertBatch(ctx context.Context, rows []IndexRow) error {
 		}
 		placeholders = append(placeholders, "("+strings.Join(slots, ",")+")")
 		args = append(args,
-			row.RequestID, row.SessionID, row.CreatedAt, row.UserID, row.APIKeyID, row.AccountID, row.GroupID,
+			row.RequestID, row.SessionID, row.ThreadID, row.Continuation, row.CreatedAt, row.UserID, row.APIKeyID, row.AccountID, row.GroupID,
 			row.UserEmail, row.APIKeyName, row.AccountName, row.GroupName, row.Platform,
 			row.Protocol, row.Endpoint, row.Model, row.Stream, row.StatusCode, row.DurationMs,
 			row.IPAddress, row.InputPreview, row.InputBytes, row.OutputBytes, row.InputTokens,
@@ -93,6 +93,9 @@ func (r *Repository) Search(ctx context.Context, filter SearchFilter) ([]IndexRo
 	if sessionID := strings.TrimSpace(filter.SessionID); sessionID != "" {
 		args = append(args, sessionID)
 		where += fmt.Sprintf(" AND c.session_id = $%d", len(args))
+	}
+	if filter.NewTurnsOnly {
+		where += " AND c.is_continuation = FALSE"
 	}
 	if keyword := strings.TrimSpace(filter.Keyword); keyword != "" {
 		args = append(args, "%"+escapeLike(keyword)+"%")
@@ -220,11 +223,11 @@ func scanIndexRows(rows *sql.Rows) ([]IndexRow, error) {
 	for rows.Next() {
 		var row IndexRow
 		if err := rows.Scan(
-			&row.ID, &row.RequestID, &row.SessionID, &row.CreatedAt, &row.UserID, &row.APIKeyID, &row.AccountID,
+			&row.ID, &row.RequestID, &row.SessionID, &row.ThreadID, &row.CreatedAt, &row.UserID, &row.APIKeyID, &row.AccountID,
 			&row.GroupID, &row.UserEmail, &row.APIKeyName, &row.AccountName, &row.GroupName,
 			&row.Platform, &row.Protocol, &row.Endpoint, &row.Model, &row.Stream, &row.StatusCode,
 			&row.DurationMs, &row.IPAddress, &row.InputPreview, &row.InputBytes, &row.OutputBytes,
-			&row.InputTokens, &row.OutputTokens, &row.ObjectKey,
+			&row.InputTokens, &row.OutputTokens, &row.ObjectKey, &row.Continuation,
 		); err != nil {
 			return nil, err
 		}

@@ -161,11 +161,9 @@ func aggregateOpenAIResponsesEvent(payload []byte, text *strings.Builder, result
 			result.Output.StopReason = status
 		}
 		if output := response.Get("output"); output.Exists() {
-			result.Output.Content = decodeJSON(output.Raw)
-			if full := flattenResponsesOutputText(output); full != "" {
-				text.Reset()
-				text.WriteString(full)
-			}
+			// 终帧带完整 output，覆盖增量拼接的文本，避免与自身重复。
+			text.Reset()
+			applyResponsesOutput(output, text, result)
 		}
 		applyResponsesUsage(response.Get("usage"), &result.Usage)
 	}
@@ -225,9 +223,9 @@ func aggregateJSON(protocol string, body []byte, result *AggregateResult) {
 	case ProtocolOpenAIResponses:
 		result.ResponseModel = gjson.GetBytes(body, "model").String()
 		result.Output.StopReason = gjson.GetBytes(body, "status").String()
-		output := gjson.GetBytes(body, "output")
-		result.Output.Content = decodeJSON(output.Raw)
-		result.Output.Text = flattenResponsesOutputText(output)
+		var text strings.Builder
+		applyResponsesOutput(gjson.GetBytes(body, "output"), &text, result)
+		result.Output.Text = text.String()
 		applyResponsesUsage(gjson.GetBytes(body, "usage"), &result.Usage)
 	case ProtocolGeminiGenerate:
 		result.ResponseModel = gjson.GetBytes(body, "modelVersion").String()
@@ -263,6 +261,76 @@ func flattenAnthropicThinking(content gjson.Result) string {
 		return true
 	})
 	return strings.Join(parts, "")
+}
+
+// applyResponsesOutput 把 Responses 的 output[] 拆进扁平字段，只把认不出的项留在
+// Content 里。
+//
+// 早先这里整段塞进 Content，导致 Responses 记录与其它协议形状不一致：thinking 与
+// tool_calls 全空（推理摘要和 function_call 都埋在 Content 里），同时 text 又在
+// Content 里重复了一遍。训练侧得按协议分两套解析，且白付一份重复体积。
+func applyResponsesOutput(output gjson.Result, text *strings.Builder, result *AggregateResult) {
+	if !output.IsArray() {
+		return
+	}
+	var thinking strings.Builder
+	var toolCalls []any
+	var unclassified []any
+
+	output.ForEach(func(_, item gjson.Result) bool {
+		itemType := strings.ToLower(strings.TrimSpace(item.Get("type").String()))
+		switch {
+		// 有些上游/中转不给 output 项打 type，只要带 content 数组就按消息处理，
+		// 否则正文会被当成"认不出的项"塞进 Content。
+		case itemType == "message", itemType == "" && item.Get("content").IsArray():
+			item.Get("content").ForEach(func(_, block gjson.Result) bool {
+				text.WriteString(block.Get("text").String())
+				return true
+			})
+		case itemType == "reasoning":
+			item.Get("summary").ForEach(func(_, block gjson.Result) bool {
+				if summary := block.Get("text").String(); summary != "" {
+					if thinking.Len() > 0 {
+						thinking.WriteString("\n")
+					}
+					thinking.WriteString(summary)
+				}
+				return true
+			})
+		case strings.HasSuffix(itemType, "_call"):
+			toolCalls = append(toolCalls, responsesToolCall(item))
+		default:
+			// 认不出的项类型（新出现的能力）原样留存，不能因为不认识就丢掉。
+			unclassified = append(unclassified, decodeJSON(item.Raw))
+		}
+		return true
+	})
+
+	if thinking.Len() > 0 {
+		result.Output.Thinking = thinking.String()
+	}
+	if len(toolCalls) > 0 {
+		result.Output.ToolCalls = toolCalls
+	}
+	if len(unclassified) > 0 {
+		result.Output.Content = unclassified
+	}
+}
+
+func responsesToolCall(item gjson.Result) map[string]any {
+	call := map[string]any{"type": item.Get("type").String()}
+	for key, path := range map[string]string{"id": "call_id", "name": "name"} {
+		if value := item.Get(path).String(); value != "" {
+			call[key] = value
+		}
+	}
+	if args := item.Get("arguments").String(); args != "" {
+		call["arguments"] = decodeJSON(args)
+	}
+	if input := item.Get("input"); input.Exists() {
+		call["input"] = decodeJSON(input.Raw)
+	}
+	return call
 }
 
 func flattenResponsesOutputText(output gjson.Result) string {

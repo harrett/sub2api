@@ -127,3 +127,45 @@ func TestAggregateKeepsEarlierUsageWhenLaterFrameIsZero(t *testing.T) {
 	require.Equal(t, 4, result.Usage.InputTokens)
 	require.Equal(t, 5, result.Usage.OutputTokens)
 }
+
+// V2 抽样 user1268：Responses 记录里 thinking 与 tool_calls 全空，推理摘要和
+// function_call 都埋在 Content 里，而 text 又在 Content 里重复了一遍。
+// 拆进扁平字段后，各协议形状一致，训练侧不必按协议分两套解析。
+func TestAggregateResponsesFlattensOutputItems(t *testing.T) {
+	body := []byte(`{
+		"model":"gpt-5.6-luna","status":"completed",
+		"output":[
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"**Inspecting config**"},{"type":"summary_text","text":"**Planning read-only scan**"}]},
+			{"type":"message","role":"assistant","content":[{"type":"output_text","text":"我会严格保持只读"}]},
+			{"type":"function_call","call_id":"c1","name":"shell","arguments":"{\"cmd\":\"ls\"}"},
+			{"type":"custom_tool_call","call_id":"c2","name":"apply_patch","input":"diff"}
+		],
+		"usage":{"input_tokens":5,"output_tokens":6}
+	}`)
+
+	result := AggregateResponse(ProtocolOpenAIResponses, body, false)
+
+	require.Equal(t, "我会严格保持只读", result.Output.Text)
+	require.Equal(t, "**Inspecting config**\n**Planning read-only scan**", result.Output.Thinking)
+	require.Len(t, result.Output.ToolCalls, 2)
+	require.Equal(t, map[string]any{
+		"type": "function_call", "id": "c1", "name": "shell",
+		"arguments": map[string]any{"cmd": "ls"},
+	}, result.Output.ToolCalls[0])
+	// 正文既然已经拆进 text/thinking/tool_calls，就不该在 Content 里再存一份。
+	require.Nil(t, result.Output.Content)
+}
+
+// 认不出的项类型（将来新增的能力）不能因为不认识就丢掉。
+func TestAggregateResponsesKeepsUnclassifiedOutputItems(t *testing.T) {
+	body := []byte(`{"output":[
+		{"type":"message","content":[{"type":"output_text","text":"hi"}]},
+		{"type":"image_generation_result","image_url":"https://example.com/a.png"}
+	]}`)
+
+	result := AggregateResponse(ProtocolOpenAIResponses, body, false)
+	require.Equal(t, "hi", result.Output.Text)
+	require.Len(t, result.Output.Content, 1)
+	require.Equal(t, "image_generation_result",
+		result.Output.Content.([]any)[0].(map[string]any)["type"])
+}

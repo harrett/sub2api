@@ -175,8 +175,9 @@ func userTextFromContent(content gjson.Result) string {
 // <environment_details>（含每轮都变的时间戳）。整条丢会丢掉用户输入，整条留会把
 // 时间戳噪音写进语料，所以必须只挖掉标签块、留下人写的部分。
 var injectedBlockTags = []string{
-	"system-reminder",     // Claude Code
-	"environment_details", // Cline / Roo / KFlash 系客户端
+	"system-reminder",      // Claude Code
+	"environment_details",  // Cline / Roo / KFlash 系客户端
+	"workspace_attachment", // AIDE 系客户端：附着工作区的文件树与变更清单
 }
 
 // injectedBlockPatterns 匹配成对标签及其内容；dangling 匹配没有闭合标签的残缺块

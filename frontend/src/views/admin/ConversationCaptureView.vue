@@ -63,6 +63,10 @@
         <button type="button" class="btn btn-primary btn-sm" :disabled="searching" @click="search">
           {{ searching ? t('common.loading') : t('common.search') }}
         </button>
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input v-model="filters.includeContinuation" type="checkbox" @change="search" />
+          <span>{{ t('admin.conversationCapture.search.includeContinuation') }}</span>
+        </label>
         <p class="text-xs text-gray-500 dark:text-gray-400">
           {{ t('admin.conversationCapture.search.limitsHint') }}
         </p>
@@ -127,6 +131,13 @@
             >
               <td class="whitespace-nowrap px-4 py-2 text-xs text-gray-600 dark:text-gray-400">
                 {{ formatTime(record.created_at) }}
+                <span
+                  v-if="record.is_continuation"
+                  class="mt-1 block w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                  :title="t('admin.conversationCapture.table.continuationHint')"
+                >
+                  {{ t('admin.conversationCapture.table.continuation') }}
+                </span>
                 <span
                   v-if="isViewed(record)"
                   class="mt-1 block w-fit rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300"
@@ -201,6 +212,10 @@
               <div class="flex gap-1">
                 <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.platform') }}</dt>
                 <dd class="font-medium text-gray-900 dark:text-gray-100">{{ fullRecordTarget.platform || '-' }}</dd>
+              </div>
+              <div v-if="fullRecordTarget.thread_id" class="flex min-w-0 gap-1">
+                <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.thread') }}</dt>
+                <dd class="truncate font-mono text-gray-700 dark:text-gray-300">{{ fullRecordTarget.thread_id }}</dd>
               </div>
               <div v-if="fullRecordTarget.session_id" class="flex min-w-0 gap-1">
                 <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.session') }}</dt>
@@ -298,6 +313,7 @@ const filters = reactive({
   end: '',
   keyword: '',
   sessionId: '',
+  includeContinuation: false,
 })
 
 // datetime-local 用的是本地时间字符串，没有时区后缀，需要手工转换两次。
@@ -362,6 +378,7 @@ async function search(): Promise<void> {
       end: new Date(filters.end).toISOString(),
       keyword: filters.keyword.trim() || undefined,
       session_id: filters.sessionId.trim() || undefined,
+      include_continuation: filters.includeContinuation || undefined,
     })
     records.value = result.records ?? []
     summary.value = result.summary ?? null

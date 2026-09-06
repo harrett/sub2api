@@ -140,3 +140,11 @@ func TestUserMessageThatIsOnlyAnInjectedBlockYieldsNothing(t *testing.T) {
 	]}`)
 	require.Equal(t, "真实提问", LastUserText(ProtocolOpenAIChat, body))
 }
+
+// V2 抽样 user114：AIDE 系客户端把工作区文件树/变更清单以 <workspace_attachment>
+// 追加在用户消息内部，在一条记录里占了 62% 的"用户输入"。
+func TestLastUserTextStripsWorkspaceAttachment(t *testing.T) {
+	body := []byte(`{"messages":[{"role":"user","content":"重新检查工作区 不是之前的参考文件 <workspace_attachment>当前对话已附着工作区。\n首次加载工作区：\n├── 📁 jni\n└── 📄 aide_ndk.sh (240B)</workspace_attachment>"}]}`)
+
+	require.Equal(t, "重新检查工作区 不是之前的参考文件", LastUserText(ProtocolOpenAIChat, body))
+}

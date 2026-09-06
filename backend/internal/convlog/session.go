@@ -24,6 +24,22 @@ var bodySessionIDPaths = []string{
 	"metadata.session_id",
 }
 
+// resolveThreadID 取会话内的线程标识。Codex 并行派发子代理时，多个线程共用一个
+// session_id——V2 抽样 user1268 的四条记录 session_id 完全相同，其中三条却是三个
+// 不同的子代理（A/B/C）在并行跑。只按 session_id 排序会把它们串在一起，
+// thread_id 才是"一条线性对话"的正确粒度。
+func resolveThreadID(body []byte) string {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+	for _, path := range []string{"client_metadata.thread_id", "thread_id"} {
+		if id := sanitizeSessionID(gjson.GetBytes(body, path).String()); id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
 // resolveSessionID 优先用请求头解析出的值，其次从请求体里找。
 func resolveSessionID(fromHeader string, body []byte) string {
 	if id := sanitizeSessionID(fromHeader); id != "" {

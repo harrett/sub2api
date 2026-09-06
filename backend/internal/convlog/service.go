@@ -310,6 +310,8 @@ func (s *Service) Capture(input CaptureInput) {
 		SchemaVersion: RecordSchemaVersion,
 		RequestID:     input.RequestID,
 		SessionID:     resolveSessionID(input.SessionID, input.RequestBody),
+		ThreadID:      resolveThreadID(input.RequestBody),
+		Continuation:  IsContinuation(protocol, input.RequestBody),
 		CreatedAt:     input.StartedAt.UTC(),
 		DurationMs:    int(input.Duration / time.Millisecond),
 		StatusCode:    input.StatusCode,
@@ -336,6 +338,8 @@ func (s *Service) Capture(input CaptureInput) {
 	row := IndexRow{
 		RequestID:    input.RequestID,
 		SessionID:    record.SessionID,
+		ThreadID:     record.ThreadID,
+		Continuation: record.Continuation,
 		CreatedAt:    record.CreatedAt,
 		UserID:       optionalID(input.Identity.UserID),
 		APIKeyID:     optionalID(input.Identity.APIKeyID),
