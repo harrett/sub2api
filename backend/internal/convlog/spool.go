@@ -326,18 +326,40 @@ func (s *Spool) ObjectKeyFor(archivePath string) string {
 	return buildObjectKey(prefix, id, segmentTime(id))
 }
 
+// LocalSegment 描述本地找到的段：路径，以及它是否已压缩。
+type LocalSegment struct {
+	Path       string
+	Compressed bool
+}
+
 // LocalPathForObjectKey 在 spool 目录里找到某个对象 key 对应的本地段。
-// 尚未上传时后台"查看全文"可以直接读本地，不必等上传完成。
-func (s *Spool) LocalPathForObjectKey(objectKey string) string {
+//
+// 必须同时认得**正在写**的段：object_key 在段打开时就算定并写进索引行，而该段要到
+// 滚动（≤64MB 或 ≤5min）压缩并上传之后才会出现在对象存储里。只找 .jsonl.gz 的话，
+// 这段窗口内后台"查看全文"会本地找不到、S3 又 NoSuchKey，直接 500。
+func (s *Spool) LocalPathForObjectKey(objectKey string) (LocalSegment, bool) {
 	base := filepath.Base(objectKey)
 	if !strings.HasSuffix(base, archivedSuffix) {
-		return ""
+		return LocalSegment{}, false
 	}
-	path := filepath.Join(s.dir, base)
-	if _, err := os.Stat(path); err != nil {
-		return ""
+	id := strings.TrimSuffix(base, archivedSuffix)
+
+	if path := filepath.Join(s.dir, base); fileExists(path) {
+		return LocalSegment{Path: path, Compressed: true}, true
 	}
-	return path
+
+	active := filepath.Join(s.dir, activePrefix+id+segmentSuffix)
+	if !fileExists(active) {
+		return LocalSegment{}, false
+	}
+	// 最后几条记录可能还在 64KB 写缓冲里，先落盘再读，否则刚发生的请求查不到。
+	s.Flush()
+	return LocalSegment{Path: active, Compressed: false}, true
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 // Remove 删除已成功上传的段及其 sidecar。

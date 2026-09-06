@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -397,18 +398,29 @@ func (s *Service) FetchFullRecord(ctx context.Context, requestID string) (json.R
 		return nil, fmt.Errorf("%w: record was indexed while disk protection was active, full text was not persisted", ErrRecordNotFound)
 	}
 
-	if local := s.spool.LocalPathForObjectKey(row.ObjectKey); local != "" {
-		if line, err := scanArchiveForRequest(local, requestID); err == nil {
-			return line, nil
+	// spool/uploader 在初始化失败的降级模式下为 nil；查全文不该因此 panic。
+	if s.spool != nil {
+		if local, ok := s.spool.LocalPathForObjectKey(row.ObjectKey); ok {
+			if line, err := scanSegmentForRequest(local, requestID); err == nil {
+				return line, nil
+			}
 		}
 	}
 
-	store := s.uploader.currentStore()
+	var store ObjectStore
+	if s.uploader != nil {
+		store = s.uploader.currentStore()
+	}
 	if store == nil {
 		return nil, fmt.Errorf("%w: object storage is not configured", ErrRecordNotFound)
 	}
 	body, err := store.Get(ctx, row.ObjectKey)
 	if err != nil {
+		if errors.Is(err, ErrObjectNotFound) {
+			// 段还没上传完，而且不在本机（多实例部署时它在另一个 pod 的磁盘上）。
+			// 这不是故障，别报 500——告诉管理员稍后再看。
+			return nil, fmt.Errorf("%w: the segment holding this record has not been uploaded yet, retry in a few minutes", ErrRecordNotFound)
+		}
 		return nil, err
 	}
 	defer func() { _ = body.Close() }()
@@ -471,14 +483,18 @@ func (s *Service) ApplySettings(ctx context.Context) {
 	s.refreshSettings(ctx)
 }
 
-// scanArchiveForRequest 在本地 gzip 段里按 request_id 找到那一行。
-func scanArchiveForRequest(path, requestID string) (json.RawMessage, error) {
-	file, err := os.Open(path)
+// scanSegmentForRequest 在本地段里按 request_id 找到那一行。正在写的段还没压缩，
+// 所以要按段的实际形态选择是否解 gzip。
+func scanSegmentForRequest(segment LocalSegment, requestID string) (json.RawMessage, error) {
+	file, err := os.Open(segment.Path)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
-	return scanReaderForRequest(file, requestID)
+	if segment.Compressed {
+		return scanReaderForRequest(file, requestID)
+	}
+	return scanPlainReaderForRequest(file, requestID)
 }
 
 func scanReaderForRequest(reader io.Reader, requestID string) (json.RawMessage, error) {
@@ -487,8 +503,11 @@ func scanReaderForRequest(reader io.Reader, requestID string) (json.RawMessage, 
 		return nil, err
 	}
 	defer func() { _ = gz.Close() }()
+	return scanPlainReaderForRequest(gz, requestID)
+}
 
-	scanner := bufio.NewScanner(gz)
+func scanPlainReaderForRequest(reader io.Reader, requestID string) (json.RawMessage, error) {
+	scanner := bufio.NewScanner(reader)
 	// 单条记录可能很大（长上下文 + 长输出），默认 64KB 的行上限不够。
 	scanner.Buffer(make([]byte, 0, 64<<10), 32<<20)
 	for scanner.Scan() {

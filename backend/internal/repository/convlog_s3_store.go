@@ -2,10 +2,12 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/Wei-Shaw/sub2api/internal/convlog"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
@@ -54,11 +56,19 @@ func (s *ConvLogS3Store) Put(ctx context.Context, key, contentType string, body 
 }
 
 // Get 下载一个段，供后台"查看全文"按 request_id 定位单行。
+//
+// NoSuchKey 翻译成 convlog.ErrObjectNotFound：段尚未上传是正常状态（对象 key 在段
+// 打开时就写进了索引行），调用方据此提示稍后重试，而不是把 S3 错误当故障抛出去。
 func (s *ConvLogS3Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	finish := servertiming.ObserveDependency(ctx, "s3")
 	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: &s.bucket, Key: &key})
 	finish()
 	if err != nil {
+		var noSuchKey *types.NoSuchKey
+		var notFound *types.NotFound
+		if errors.As(err, &noSuchKey) || errors.As(err, &notFound) {
+			return nil, fmt.Errorf("%w: %s", convlog.ErrObjectNotFound, key)
+		}
 		return nil, fmt.Errorf("S3 GetObject %s: %w", key, err)
 	}
 	return out.Body, nil

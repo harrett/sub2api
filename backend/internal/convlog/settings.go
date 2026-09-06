@@ -39,6 +39,10 @@ func (c *S3Config) IsConfigured() bool {
 	return c != nil && c.Bucket != "" && c.AccessKeyID != "" && c.SecretAccessKey != ""
 }
 
+// ErrObjectNotFound 表示对象存储里没有该 key。实现方必须把上游的 NoSuchKey 翻译成它，
+// 否则"段还没上传完"这种正常状态会被当成故障报 500。
+var ErrObjectNotFound = errors.New("object not found in storage")
+
 // ObjectStore 是 convlog 需要的最小对象存储能力，由 repository 层实现。
 type ObjectStore interface {
 	Put(ctx context.Context, key, contentType string, body io.Reader, size int64) error
