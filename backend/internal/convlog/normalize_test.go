@@ -39,8 +39,7 @@ func TestNormalizeAnthropicRequest(t *testing.T) {
 
 	conv := NormalizeRequest(ProtocolAnthropicMessages, body)
 	require.Equal(t, "you are helpful", conv.System)
-	require.Len(t, conv.Messages, 1)
-	require.Equal(t, "user", conv.Messages[0].Role)
+	require.Equal(t, []RoleRef{{Index: 0, Role: RoleUser}}, conv.Roles)
 	require.NotNil(t, conv.Tools)
 }
 
@@ -56,8 +55,12 @@ func TestNormalizeOpenAIChatLiftsSystemMessage(t *testing.T) {
 
 	conv := NormalizeRequest(ProtocolOpenAIChat, body)
 	require.Equal(t, "be concise", conv.System)
-	require.Len(t, conv.Messages, 1)
-	require.Equal(t, "user", conv.Messages[0].Role)
+	// system 提到 Conversation.System 之后，角色索引仍要覆盖原数组的每一项，
+	// 否则下标会与 raw_request.messages 错位。
+	require.Equal(t, []RoleRef{
+		{Index: 0, Role: "system"},
+		{Index: 1, Role: RoleUser},
+	}, conv.Roles)
 }
 
 func TestNormalizeGeminiMapsModelRoleToAssistant(t *testing.T) {
@@ -71,8 +74,10 @@ func TestNormalizeGeminiMapsModelRoleToAssistant(t *testing.T) {
 
 	conv := NormalizeRequest(ProtocolGeminiGenerate, body)
 	require.Equal(t, "sys", conv.System)
-	require.Len(t, conv.Messages, 2)
-	require.Equal(t, "assistant", conv.Messages[1].Role)
+	require.Equal(t, []RoleRef{
+		{Index: 0, Role: RoleUser},
+		{Index: 1, Role: RoleAssistant},
+	}, conv.Roles)
 }
 
 func TestExtractPreviewTruncatesOnUTF8Boundary(t *testing.T) {

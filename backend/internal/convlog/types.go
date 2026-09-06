@@ -21,7 +21,8 @@ const (
 	ProtocolUnknown           = "unknown"
 
 	// RecordSchemaVersion 随归一化 schema 的不兼容变更递增，训练侧按此分流。
-	RecordSchemaVersion = 1
+	// v2：去掉与 raw_request 逐字重复的 conversation.messages，改存角色索引。
+	RecordSchemaVersion = 2
 )
 
 // 默认值。数值上限在 normalizeSettings 里强制收敛，配置写错不会击穿保护。
@@ -115,11 +116,27 @@ type ModelInfo struct {
 	Response  string `json:"response,omitempty"`
 }
 
-// Message 是归一化后的一轮对话。Content 保留结构化块（text / image / tool_result），
-// 不拍平成字符串，避免丢掉多模态与工具调用信息。
-type Message struct {
-	Role    string `json:"role"`
-	Content any    `json:"content"`
+// 角色标识。RoleUnknown 是显式的"认不出来"，不能拿 user 顶替——
+// 把工具输出标成用户发言会直接毒化训练语料。
+const (
+	RoleUser      = "user"
+	RoleAssistant = "assistant"
+	RoleTool      = "tool"
+	RoleUnknown   = "unknown"
+)
+
+// RoleRef 给原始请求里的第 Index 项标注角色，不复制正文。
+//
+// 早先这里存的是完整的归一化 messages，但四种协议下归一化几乎都是恒等映射，
+// 于是每条记录把同一份对话存了两遍——单条 1.19MB 里有 47% 是副本，而 gzip 的
+// 32KB 滑窗够不到 540KB 外的重复块，压缩也救不回来。正文只留 raw_request 一份，
+// 这里只补它缺的那一样东西：可靠的角色。
+type RoleRef struct {
+	Index int    `json:"i"`
+	Role  string `json:"role"`
+	// Type 是协议原生的项类型（reasoning / custom_tool_call_output / message …），
+	// 训练侧按它做细粒度过滤。
+	Type string `json:"type,omitempty"`
 }
 
 // Output 是归一化后的模型输出。
@@ -134,12 +151,15 @@ type Output struct {
 	Truncated bool `json:"truncated,omitempty"`
 }
 
-// Conversation 是训练直接消费的归一化视图。
+// Conversation 是训练消费的归一化视图。正文不在这里——在 raw_request。
 type Conversation struct {
-	System   string    `json:"system,omitempty"`
-	Messages []Message `json:"messages,omitempty"`
-	Tools    any       `json:"tools,omitempty"`
-	Output   *Output   `json:"output,omitempty"`
+	// System 是跨协议归一化的系统提示（Anthropic system / Responses instructions /
+	// Gemini systemInstruction / chat 的 system+developer 消息），四处来源统一成一处。
+	System string `json:"system,omitempty"`
+	// Roles 按下标标注 raw_request 里每一项的角色。
+	Roles  []RoleRef `json:"roles,omitempty"`
+	Tools  any       `json:"tools,omitempty"`
+	Output *Output   `json:"output,omitempty"`
 }
 
 // Usage 是 token 计数快照，来源于响应体自身，不查计费库。

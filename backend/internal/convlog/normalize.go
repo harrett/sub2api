@@ -170,30 +170,28 @@ func sanitizeUserText(text string) string {
 	return strings.Join(strings.Fields(text), " ")
 }
 
-// NormalizeRequest 把客户端请求体解析成统一的对话视图。
-// 解析失败时返回零值——归一化是尽力而为的，RawRequest 始终保底。
+// NormalizeRequest 归一化系统提示、工具定义与逐项角色。对话正文不复制——
+// 它已经完整存在 raw_request 里，再存一份只是把每条记录体积翻倍。
+// 解析失败时返回零值：归一化是尽力而为的，RawRequest 始终保底。
 func NormalizeRequest(protocol string, body []byte) Conversation {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return Conversation{}
 	}
+	var conv Conversation
 	switch protocol {
 	case ProtocolAnthropicMessages:
-		return normalizeAnthropicRequest(body)
+		conv.System = flattenTextValue(gjson.GetBytes(body, "system"))
+		conv.Roles = rolesFromRoleBearingArray(gjson.GetBytes(body, "messages"))
 	case ProtocolOpenAIChat:
-		return normalizeOpenAIChatRequest(body)
+		conv.System, conv.Roles = normalizeOpenAIChatRoles(gjson.GetBytes(body, "messages"))
 	case ProtocolOpenAIResponses:
-		return normalizeOpenAIResponsesRequest(body)
+		conv.System = gjson.GetBytes(body, "instructions").String()
+		conv.Roles = rolesFromResponsesInput(gjson.GetBytes(body, "input"))
 	case ProtocolGeminiGenerate:
-		return normalizeGeminiRequest(body)
+		conv.System = geminiSystemInstruction(body)
+		conv.Roles = rolesFromGeminiContents(gjson.GetBytes(body, "contents"))
 	default:
-		return normalizeGenericRequest(body)
-	}
-}
-
-func normalizeAnthropicRequest(body []byte) Conversation {
-	conv := Conversation{
-		System:   flattenTextValue(gjson.GetBytes(body, "system")),
-		Messages: messagesFromArray(gjson.GetBytes(body, "messages")),
+		conv.Roles = rolesFromGenericBody(body)
 	}
 	if tools := gjson.GetBytes(body, "tools"); tools.Exists() {
 		conv.Tools = decodeJSON(tools.Raw)
@@ -201,110 +199,124 @@ func normalizeAnthropicRequest(body []byte) Conversation {
 	return conv
 }
 
-func normalizeOpenAIChatRequest(body []byte) Conversation {
-	messages := messagesFromArray(gjson.GetBytes(body, "messages"))
-	conv := Conversation{}
-	// OpenAI 把 system/developer 放在 messages 里；单独抽出来对齐 Anthropic 视图，
-	// 训练侧不必再按协议分支处理。
-	kept := messages[:0]
-	for _, msg := range messages {
-		role := strings.ToLower(msg.Role)
+// rolesFromRoleBearingArray 处理每项都自带 role 的协议（Anthropic messages）。
+func rolesFromRoleBearingArray(array gjson.Result) []RoleRef {
+	return collectRoles(array, func(item gjson.Result) (string, string) {
+		return normalizeRoleName(item.Get("role").String()), item.Get("type").String()
+	})
+}
+
+// normalizeOpenAIChatRoles 顺带把 system/developer 消息提到 Conversation.System，
+// 与其它协议的视图对齐；这些项在角色索引里仍按原角色标注，下标不会错位。
+func normalizeOpenAIChatRoles(messages gjson.Result) (string, []RoleRef) {
+	var system string
+	roles := collectRoles(messages, func(item gjson.Result) (string, string) {
+		role := strings.ToLower(strings.TrimSpace(item.Get("role").String()))
 		if role == "system" || role == "developer" {
-			if text := flattenAnyText(msg.Content); text != "" {
-				conv.System = joinNonEmpty(conv.System, text)
-			}
-			continue
+			system = joinNonEmpty(system, flattenTextValue(item.Get("content")))
 		}
-		kept = append(kept, msg)
-	}
-	conv.Messages = kept
-	if tools := gjson.GetBytes(body, "tools"); tools.Exists() {
-		conv.Tools = decodeJSON(tools.Raw)
-	}
-	return conv
+		return normalizeRoleName(role), ""
+	})
+	return system, roles
 }
 
-func normalizeOpenAIResponsesRequest(body []byte) Conversation {
-	conv := Conversation{System: gjson.GetBytes(body, "instructions").String()}
-	input := gjson.GetBytes(body, "input")
+func rolesFromResponsesInput(input gjson.Result) []RoleRef {
+	if input.Type == gjson.String {
+		// input 是裸字符串时整个请求就是一条用户输入。
+		return []RoleRef{{Index: 0, Role: RoleUser}}
+	}
+	return collectRoles(input, func(item gjson.Result) (string, string) {
+		itemType := item.Get("type").String()
+		if role := item.Get("role").String(); role != "" {
+			return normalizeRoleName(role), itemType
+		}
+		return responsesRoleFromType(itemType), itemType
+	})
+}
+
+// responsesRoleFromType 推断 Responses 里不带 role 的项属于谁。
+//
+// Codex 的 agent 循环中这类项占绝大多数（reasoning / *_call / *_output），
+// 早先它们统一落到 "user" 兜底上，于是一条只有 2 句真实用户输入的会话被标成
+// 65 条 user——拿去蒸馏会让模型学到"工具输出是用户说的话"。
+// 后缀判断能覆盖将来新增的 *_call / *_output 类型，认不出就明说 unknown。
+func responsesRoleFromType(itemType string) string {
+	switch strings.ToLower(strings.TrimSpace(itemType)) {
+	case "reasoning", "agent_message":
+		return RoleAssistant
+	case "":
+		return RoleUnknown
+	}
 	switch {
-	case input.Type == gjson.String:
-		conv.Messages = []Message{{Role: "user", Content: input.String()}}
-	case input.IsArray():
-		conv.Messages = messagesFromArray(input)
+	case strings.HasSuffix(itemType, "_output"):
+		return RoleTool
+	case strings.HasSuffix(itemType, "_call"):
+		return RoleAssistant
+	default:
+		return RoleUnknown
 	}
-	if tools := gjson.GetBytes(body, "tools"); tools.Exists() {
-		conv.Tools = decodeJSON(tools.Raw)
-	}
-	return conv
 }
 
-func normalizeGeminiRequest(body []byte) Conversation {
-	conv := Conversation{}
+func rolesFromGeminiContents(contents gjson.Result) []RoleRef {
+	return collectRoles(contents, func(item gjson.Result) (string, string) {
+		role := strings.ToLower(strings.TrimSpace(item.Get("role").String()))
+		if role == "" {
+			// Gemini 省略 role 时按官方语义就是 user。
+			return RoleUser, ""
+		}
+		return normalizeRoleName(role), ""
+	})
+}
+
+func geminiSystemInstruction(body []byte) string {
+	var system string
 	for _, key := range []string{"systemInstruction", "system_instruction"} {
 		if node := gjson.GetBytes(body, key); node.Exists() {
-			conv.System = joinNonEmpty(conv.System, flattenGeminiParts(node.Get("parts")))
+			system = joinNonEmpty(system, flattenGeminiParts(node.Get("parts")))
 		}
 	}
-	contents := gjson.GetBytes(body, "contents")
-	if contents.IsArray() {
-		messages := make([]Message, 0, len(contents.Array()))
-		contents.ForEach(func(_, item gjson.Result) bool {
-			role := item.Get("role").String()
-			if role == "" {
-				role = "user"
-			}
-			if role == "model" {
-				role = "assistant"
-			}
-			messages = append(messages, Message{Role: role, Content: decodeJSON(item.Get("parts").Raw)})
-			return true
-		})
-		conv.Messages = messages
-	}
-	if tools := gjson.GetBytes(body, "tools"); tools.Exists() {
-		conv.Tools = decodeJSON(tools.Raw)
-	}
-	return conv
+	return system
 }
 
-// normalizeGenericRequest 是未知协议的兜底：把能认出来的 messages/contents/input
-// 收进来，认不出就留空，靠 RawRequest 保底。
-func normalizeGenericRequest(body []byte) Conversation {
-	conv := Conversation{}
-	if messages := gjson.GetBytes(body, "messages"); messages.IsArray() {
-		conv.Messages = messagesFromArray(messages)
-	}
-	if conv.Messages == nil {
-		if contents := gjson.GetBytes(body, "contents"); contents.IsArray() {
-			conv.Messages = messagesFromArray(contents)
+// rolesFromGenericBody 是未知协议的兜底：认得出哪个数组是对话就标注它。
+func rolesFromGenericBody(body []byte) []RoleRef {
+	for _, key := range []string{"messages", "contents", "input"} {
+		if node := gjson.GetBytes(body, key); node.IsArray() {
+			return rolesFromRoleBearingArray(node)
 		}
 	}
-	if input := gjson.GetBytes(body, "input"); conv.Messages == nil && input.Type == gjson.String {
-		conv.Messages = []Message{{Role: "user", Content: input.String()}}
-	}
-	return conv
+	return nil
 }
 
-func messagesFromArray(node gjson.Result) []Message {
-	if !node.IsArray() {
+func collectRoles(array gjson.Result, classify func(gjson.Result) (role, itemType string)) []RoleRef {
+	if !array.IsArray() {
 		return nil
 	}
-	array := node.Array()
-	messages := make([]Message, 0, len(array))
-	for _, item := range array {
-		role := item.Get("role").String()
-		if role == "" {
-			role = "user"
-		}
-		content := item.Get("content")
-		if !content.Exists() {
-			// Responses API 的 input 项可能直接是 {"type":"input_text","text":...}
-			content = item
-		}
-		messages = append(messages, Message{Role: role, Content: decodeJSON(content.Raw)})
+	items := array.Array()
+	roles := make([]RoleRef, 0, len(items))
+	for i, item := range items {
+		role, itemType := classify(item)
+		roles = append(roles, RoleRef{Index: i, Role: role, Type: itemType})
 	}
-	return messages
+	return roles
+}
+
+// normalizeRoleName 把各协议的角色名收敛到统一取值。空值返回 unknown 而不是
+// 猜一个——猜错的角色比缺失的角色危害大得多。
+func normalizeRoleName(role string) string {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "user", "human":
+		return RoleUser
+	case "assistant", "model":
+		return RoleAssistant
+	case "tool", "function":
+		return RoleTool
+	case "":
+		return RoleUnknown
+	default:
+		// system / developer 等原样保留，它们本身就是明确语义。
+		return strings.ToLower(strings.TrimSpace(role))
+	}
 }
 
 // flattenTextValue 把 string 或 [{type:text,text:...}] 结构压成纯文本。
@@ -342,28 +354,6 @@ func flattenGeminiParts(node gjson.Result) string {
 		return true
 	})
 	return strings.Join(parts, "\n")
-}
-
-func flattenAnyText(value any) string {
-	switch typed := value.(type) {
-	case string:
-		return typed
-	case []any:
-		var parts []string
-		for _, item := range typed {
-			if text := flattenAnyText(item); text != "" {
-				parts = append(parts, text)
-			}
-		}
-		return strings.Join(parts, "\n")
-	case map[string]any:
-		if text, ok := typed["text"].(string); ok {
-			return text
-		}
-		return ""
-	default:
-		return ""
-	}
 }
 
 // decodeJSON 把原始 JSON 片段解成 any，失败时返回原始字符串而不是丢弃。

@@ -127,7 +127,7 @@ func TestMiddlewareEnqueuesNormalizedRecord(t *testing.T) {
 	require.Equal(t, RecordSchemaVersion, record.SchemaVersion)
 	require.NotNil(t, record.Conversation.Output)
 	require.Equal(t, "like this", record.Conversation.Output.Text)
-	require.Len(t, record.Conversation.Messages, 1)
+	require.Equal(t, []RoleRef{{Index: 0, Role: RoleUser}}, record.Conversation.Roles)
 	require.NotNil(t, record.RawRequest)
 }
 

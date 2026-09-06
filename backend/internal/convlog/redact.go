@@ -34,8 +34,18 @@ var sensitiveJSONKeys = map[string]struct{}{
 	"private_key":         {},
 }
 
-// redactJSON 递归抹掉 JSON 值里的凭证字段。传入的是 encoding/json 解码结果
-// （map[string]any / []any / 标量），原地改写并返回同一个值。
+// droppedJSONKeys 是整段删除（而非替换成占位符）的字段：内容不透明，
+// 对训练和风控都零价值，留着只占体积。
+//
+// encrypted_content 是 OpenAI 给 reasoning 项附带的密文，实测单条 Codex 记录
+// 里就有 64KB，占该记录的 5.4%，而人和模型都永远读不了它。
+var droppedJSONKeys = map[string]struct{}{
+	"encrypted_content": {},
+}
+
+// redactJSON 递归清洗 JSON 值：凭证字段替换成占位符，不透明字段整段删除。
+// 传入的是 encoding/json 解码结果（map[string]any / []any / 标量），
+// 原地改写并返回同一个值。
 //
 // 深度上限防御畸形深嵌套导致的栈增长；超深部分整体丢弃而不是继续递归。
 func redactJSON(value any) any {
@@ -51,7 +61,12 @@ func redactJSONDepth(value any, depth int) any {
 	switch typed := value.(type) {
 	case map[string]any:
 		for key, child := range typed {
-			if _, sensitive := sensitiveJSONKeys[strings.ToLower(strings.TrimSpace(key))]; sensitive {
+			normalized := strings.ToLower(strings.TrimSpace(key))
+			if _, dropped := droppedJSONKeys[normalized]; dropped {
+				delete(typed, key)
+				continue
+			}
+			if _, sensitive := sensitiveJSONKeys[normalized]; sensitive {
 				typed[key] = redactedPlaceholder
 				continue
 			}

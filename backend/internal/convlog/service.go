@@ -290,6 +290,8 @@ func (s *Service) Capture(input CaptureInput) {
 
 	protocol := DetectProtocol(input.Endpoint, input.RequestBody)
 	aggregate := AggregateResponse(protocol, input.ResponseBody, input.ResponseTruncated)
+	// 响应侧同样要清洗：上游把 reasoning 的密文也回写在 output 里。
+	aggregate.Output.Content = redactJSON(aggregate.Output.Content)
 
 	conversation := NormalizeRequest(protocol, input.RequestBody)
 	conversation.Output = &aggregate.Output

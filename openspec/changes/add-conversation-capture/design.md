@@ -43,7 +43,7 @@ Bedrock / Grok 全部上游，无需在每个 forward 分支里埋点。
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "request_id": "req_...",
   "created_at": "2026-09-04T10:00:00Z",
   "duration_ms": 4210,
@@ -60,7 +60,11 @@ Bedrock / Grok 全部上游，无需在每个 forward 分支里埋点。
   "model": { "requested": "claude-opus-4-5", "upstream": "...", "response": "..." },
   "conversation": {
     "system": "...",
-    "messages": [ { "role": "user", "content": [ { "type": "text", "text": "..." } ] } ],
+    "roles": [
+      { "i": 0, "role": "user" },
+      { "i": 1, "role": "assistant", "type": "reasoning" },
+      { "i": 2, "role": "tool", "type": "custom_tool_call_output" }
+    ],
     "tools": [ ... ],
     "output": {
       "role": "assistant",
@@ -75,15 +79,34 @@ Bedrock / Grok 全部上游，无需在每个 forward 分支里埋点。
 }
 ```
 
-`conversation` 是训练直接消费的归一化视图；`raw_request` 保留客户端原始 JSON（已脱敏）作为
-回溯底本。**原始响应流不落盘** —— SSE 冗余约 3~5x，归一化输出已覆盖训练需要。
+`raw_request` 是对话正文的**唯一一份**（已脱敏）；`conversation` 只放 raw_request 缺的东西：
+跨协议归一化的 system、逐项角色索引、聚合后的模型输出。**原始响应流不落盘** ——
+SSE 冗余约 3~5x，归一化输出已覆盖训练需要。
+
+### 为什么 v2 去掉了 conversation.messages
+
+v1 同时存"归一化 messages"与"原始 raw_request"，但四种协议下归一化几乎都是恒等映射，
+于是每条记录把同一份对话存了两遍。生产抽样实测：单条 1.19MB 里 47% 是逐字副本（77 项中
+76 项完全相同），而 gzip 的 32KB 滑窗够不到 540KB 外的重复块，压缩救不回来——gzip 后
+仍是 339KB 对 174KB，实打实 2x。
+
+同时 v1 的角色是错的：Responses 的 input 项里大多数不带 `role`（reasoning、`*_call`、
+`*_output`），旧代码统一兜底成 `user`，导致一条只有 2 句真实用户输入的 Codex 会话被标成
+65 条 user。这种语料会让模型学到"工具输出是用户说的话"。
+
+v2 因此改为：正文只留 raw_request，`conversation.roles` 按下标补上可靠角色，识别不了的
+项标 `unknown` 而不是猜一个。同一条抽样：1,192KB → 512KB（gzip 347KB → 120KB，小 66%），
+角色分布由 `user×65` 修正为 `user×2 / assistant×49 / tool×20 / developer×6`。
+
+`encrypted_content`（上游 reasoning 附带的不透明密文，抽样里占 64KB / 5.4%）在落盘前整段
+删除——人和模型都读不了它。请求参数 `include: ["reasoning.encrypted_content"]` 是合法元数据，保留。
 
 ### 协议归一化
 
 | protocol | 请求 | 响应（非流式） | 响应（SSE） |
 |---|---|---|---|
-| `anthropic_messages` | `system` + `messages[]` + `tools[]` | `content[]` / `stop_reason` | `content_block_delta.delta.{text,thinking,partial_json}` + `message_delta` |
-| `openai_chat` | `messages[]` + `tools[]` | `choices[0].message` | `choices[0].delta.{content,tool_calls}` |
+| `anthropic_messages` | `system` + `messages[].role` + `tools[]` | `content[]` / `stop_reason` | `content_block_delta.delta.{text,thinking,partial_json}` + `message_delta` |
+| `openai_chat` | `messages[].role`（system/developer 提到 `system`）+ `tools[]` | `choices[0].message` | `choices[0].delta.{content,tool_calls}` |
 | `openai_responses` | `instructions` + `input[]` + `tools[]` | `output[]` | `response.output_text.delta`，终帧 `response.completed.response` 优先 |
 | `gemini_generate` | `systemInstruction` + `contents[]` + `tools[]` | `candidates[0].content.parts[]` | 逐帧 `candidates[0].content.parts[]` 累加 |
 
