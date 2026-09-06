@@ -293,8 +293,16 @@ func (s *Service) Capture(input CaptureInput) {
 	// 响应侧同样要清洗：上游把 reasoning 的密文也回写在 output 里。
 	aggregate.Output.Content = redactJSON(aggregate.Output.Content)
 
-	conversation := NormalizeRequest(protocol, input.RequestBody)
-	conversation.Output = &aggregate.Output
+	conversation := Conversation{Output: &aggregate.Output}
+	var rawRequest any
+	if settings.CaptureScope == ScopeFull {
+		// 先脱敏再取角色：脱敏面向整棵树，顺序反了会让"落盘前必然脱敏"
+		// 这个不变量依赖其它逻辑的正确性。
+		rawRequest = redactJSON(decodeJSONBytes(input.RequestBody))
+		conversation.Roles = RequestRoles(protocol, rawRequest)
+	} else {
+		conversation.Input = LastUserText(protocol, input.RequestBody)
+	}
 
 	record := Record{
 		SchemaVersion: RecordSchemaVersion,
@@ -313,7 +321,7 @@ func (s *Service) Capture(input CaptureInput) {
 		},
 		Conversation: conversation,
 		Usage:        aggregate.Usage,
-		RawRequest:   redactJSON(decodeJSONBytes(input.RequestBody)),
+		RawRequest:   rawRequest,
 	}
 
 	line, err := json.Marshal(&record)

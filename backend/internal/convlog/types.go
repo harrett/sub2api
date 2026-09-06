@@ -20,8 +20,11 @@ const (
 	ProtocolGeminiGenerate    = "gemini_generate"
 	ProtocolUnknown           = "unknown"
 
-	// RecordSchemaVersion 随归一化 schema 的不兼容变更递增，训练侧按此分流。
-	// v2：去掉与 raw_request 逐字重复的 conversation.messages，改存角色索引。
+	// RecordSchemaVersion 随记录 schema 的不兼容变更递增，训练侧按此分流。
+	//
+	// v2：正文只留 raw_request 一份（去掉逐字重复的 conversation.messages），
+	// conversation 只保留角色索引与聚合输出，默认按 ScopeEssential 裁剪掉
+	// 系统提示、工具定义与重发的历史。线上此前只写过 v1，不存在中间形态的 v2。
 	RecordSchemaVersion = 2
 )
 
@@ -66,6 +69,10 @@ const (
 type Settings struct {
 	Enabled       bool `json:"enabled"`
 	ReuseBackupS3 bool `json:"reuse_backup_s3"`
+
+	// CaptureScope 决定每条记录留多少正文：essential（默认，只留用户输入与模型
+	// 输出）或 full（保留脱敏后的完整请求）。生产抽样上两者相差约 60 倍。
+	CaptureScope string `json:"capture_scope"`
 
 	// SampleRate 为 0 或 1 表示全量捕获；0<r<1 时按请求随机采样。
 	SampleRate float64 `json:"sample_rate"`
@@ -151,14 +158,17 @@ type Output struct {
 	Truncated bool `json:"truncated,omitempty"`
 }
 
-// Conversation 是训练消费的归一化视图。正文不在这里——在 raw_request。
+// Conversation 是记录的正文。
+//
+// ScopeEssential 下只有 Input + Output —— 这正好是两个目标需要的全部：
+// 追溯用户输入，以及"用户输入→模型输出"的蒸馏样本。系统提示、工具定义、
+// 注入上下文和重发的历史都不落盘。
+// ScopeFull 下改为 Roles + 顶层 raw_request 保存完整请求。
 type Conversation struct {
-	// System 是跨协议归一化的系统提示（Anthropic system / Responses instructions /
-	// Gemini systemInstruction / chat 的 system+developer 消息），四处来源统一成一处。
-	System string `json:"system,omitempty"`
-	// Roles 按下标标注 raw_request 里每一项的角色。
+	// Input 是本轮真实用户输入的原文（ScopeEssential）。
+	Input string `json:"input,omitempty"`
+	// Roles 按下标标注 raw_request 里每一项的角色（ScopeFull）。
 	Roles  []RoleRef `json:"roles,omitempty"`
-	Tools  any       `json:"tools,omitempty"`
 	Output *Output   `json:"output,omitempty"`
 }
 

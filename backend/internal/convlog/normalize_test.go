@@ -29,57 +29,6 @@ func TestDetectProtocol(t *testing.T) {
 	}
 }
 
-func TestNormalizeAnthropicRequest(t *testing.T) {
-	body := []byte(`{
-		"model":"claude-opus-4-5",
-		"system":[{"type":"text","text":"you are helpful"}],
-		"messages":[{"role":"user","content":[{"type":"text","text":"hello"}]}],
-		"tools":[{"name":"grep"}]
-	}`)
-
-	conv := NormalizeRequest(ProtocolAnthropicMessages, body)
-	require.Equal(t, "you are helpful", conv.System)
-	require.Equal(t, []RoleRef{{Index: 0, Role: RoleUser}}, conv.Roles)
-	require.NotNil(t, conv.Tools)
-}
-
-// OpenAI 把 system 放在 messages 里；归一化后必须提到 Conversation.System，
-// 训练侧才不用再按协议分支处理。
-func TestNormalizeOpenAIChatLiftsSystemMessage(t *testing.T) {
-	body := []byte(`{
-		"messages":[
-			{"role":"system","content":"be concise"},
-			{"role":"user","content":"hi"}
-		]
-	}`)
-
-	conv := NormalizeRequest(ProtocolOpenAIChat, body)
-	require.Equal(t, "be concise", conv.System)
-	// system 提到 Conversation.System 之后，角色索引仍要覆盖原数组的每一项，
-	// 否则下标会与 raw_request.messages 错位。
-	require.Equal(t, []RoleRef{
-		{Index: 0, Role: "system"},
-		{Index: 1, Role: RoleUser},
-	}, conv.Roles)
-}
-
-func TestNormalizeGeminiMapsModelRoleToAssistant(t *testing.T) {
-	body := []byte(`{
-		"systemInstruction":{"parts":[{"text":"sys"}]},
-		"contents":[
-			{"role":"user","parts":[{"text":"hi"}]},
-			{"role":"model","parts":[{"text":"hello"}]}
-		]
-	}`)
-
-	conv := NormalizeRequest(ProtocolGeminiGenerate, body)
-	require.Equal(t, "sys", conv.System)
-	require.Equal(t, []RoleRef{
-		{Index: 0, Role: RoleUser},
-		{Index: 1, Role: RoleAssistant},
-	}, conv.Roles)
-}
-
 func TestExtractPreviewTruncatesOnUTF8Boundary(t *testing.T) {
 	body := []byte(`{"messages":[{"role":"user","content":"中文中文中文"}]}`)
 

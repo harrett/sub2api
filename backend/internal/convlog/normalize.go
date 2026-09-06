@@ -46,10 +46,23 @@ func DetectProtocol(endpoint string, body []byte) string {
 // tool_result，按审核语义取会得到空串——这正是列表里出现"（无文本输入）"而
 // 全文里明明有用户输入的原因。这里改成从后往前找最近一条**真正的用户文本**。
 func ExtractPreview(protocol string, body []byte, limit int) string {
+	// 预览是列表里的一行，压成单行；LastUserText 本身保留原始换行供训练使用。
+	return truncateUTF8(strings.Join(strings.Fields(LastUserText(protocol, body)), " "), limit)
+}
+
+// LastUserText 返回本轮最后一条真实用户输入的原文（保留换行，不截断）。
+//
+// "最后一条"不是随便挑的：客户端注入的内容（系统提示、压缩历史、运行时快照、
+// 技能目录）总是排在真人那句之前，两份生产抽样都如此。取最后一条既能避开这些
+// 注入，又天然与列表预览一致——预览显示什么，全文里就是什么。
+//
+// 更早的那些真实用户输入不会丢：它们各自曾是所属那一轮请求的"最后一条"，
+// 已由那一轮的记录保存过。存全量只会把同一句话在整个会话里抄 N 遍。
+func LastUserText(protocol string, body []byte) string {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return ""
 	}
-	return truncateUTF8(lastUserText(protocol, body), limit)
+	return lastUserText(protocol, body)
 }
 
 func lastUserText(protocol string, body []byte) string {
@@ -156,82 +169,34 @@ func userTextFromContent(content gjson.Result) string {
 	}
 }
 
-// sanitizeUserText 丢掉平台自己注入的上下文块，只留真正的用户输入。
-// 注入内容（system-reminder、Codex 安全策略文档）出现在预览里会把风控人员
-// 引向错误结论——他们会以为这些话是用户说的。
+// injectedContentMarkers 是客户端注入内容的特征串。这些内容以 role=user 发出，
+// 但不是人打的——某些客户端（DeepSeek Harness）97% 的 user 字节都是这类东西。
+// 把它们当成用户输入会让风控看错人，也会让蒸馏语料被样板文本淹没。
+var injectedContentMarkers = []string{
+	// Claude Code / Codex 注入的上下文提醒
+	"<system-reminder>",
+	// 会话压缩检查点：客户端自动生成的历史摘要
+	"This is an automatically generated checkpoint condensing an earlier span of the conversation",
+	// 运行时上下文快照，每轮重发
+	"Current runtime context. This snapshot supersedes earlier runtime-context snapshots",
+}
+
+// sanitizeUserText 丢掉平台自己注入的上下文块，只留真正的用户输入，
+// 并保留原始换行——训练要的是用户实际打出来的样子。
 func sanitizeUserText(text string) string {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return ""
 	}
-	if strings.Contains(text, "<system-reminder>") || service.IsInjectedPlatformPrompt(text) {
+	for _, marker := range injectedContentMarkers {
+		if strings.Contains(text, marker) {
+			return ""
+		}
+	}
+	if service.IsInjectedPlatformPrompt(text) {
 		return ""
 	}
-	return strings.Join(strings.Fields(text), " ")
-}
-
-// NormalizeRequest 归一化系统提示、工具定义与逐项角色。对话正文不复制——
-// 它已经完整存在 raw_request 里，再存一份只是把每条记录体积翻倍。
-// 解析失败时返回零值：归一化是尽力而为的，RawRequest 始终保底。
-func NormalizeRequest(protocol string, body []byte) Conversation {
-	if len(body) == 0 || !gjson.ValidBytes(body) {
-		return Conversation{}
-	}
-	var conv Conversation
-	switch protocol {
-	case ProtocolAnthropicMessages:
-		conv.System = flattenTextValue(gjson.GetBytes(body, "system"))
-		conv.Roles = rolesFromRoleBearingArray(gjson.GetBytes(body, "messages"))
-	case ProtocolOpenAIChat:
-		conv.System, conv.Roles = normalizeOpenAIChatRoles(gjson.GetBytes(body, "messages"))
-	case ProtocolOpenAIResponses:
-		conv.System = gjson.GetBytes(body, "instructions").String()
-		conv.Roles = rolesFromResponsesInput(gjson.GetBytes(body, "input"))
-	case ProtocolGeminiGenerate:
-		conv.System = geminiSystemInstruction(body)
-		conv.Roles = rolesFromGeminiContents(gjson.GetBytes(body, "contents"))
-	default:
-		conv.Roles = rolesFromGenericBody(body)
-	}
-	if tools := gjson.GetBytes(body, "tools"); tools.Exists() {
-		conv.Tools = decodeJSON(tools.Raw)
-	}
-	return conv
-}
-
-// rolesFromRoleBearingArray 处理每项都自带 role 的协议（Anthropic messages）。
-func rolesFromRoleBearingArray(array gjson.Result) []RoleRef {
-	return collectRoles(array, func(item gjson.Result) (string, string) {
-		return normalizeRoleName(item.Get("role").String()), item.Get("type").String()
-	})
-}
-
-// normalizeOpenAIChatRoles 顺带把 system/developer 消息提到 Conversation.System，
-// 与其它协议的视图对齐；这些项在角色索引里仍按原角色标注，下标不会错位。
-func normalizeOpenAIChatRoles(messages gjson.Result) (string, []RoleRef) {
-	var system string
-	roles := collectRoles(messages, func(item gjson.Result) (string, string) {
-		role := strings.ToLower(strings.TrimSpace(item.Get("role").String()))
-		if role == "system" || role == "developer" {
-			system = joinNonEmpty(system, flattenTextValue(item.Get("content")))
-		}
-		return normalizeRoleName(role), ""
-	})
-	return system, roles
-}
-
-func rolesFromResponsesInput(input gjson.Result) []RoleRef {
-	if input.Type == gjson.String {
-		// input 是裸字符串时整个请求就是一条用户输入。
-		return []RoleRef{{Index: 0, Role: RoleUser}}
-	}
-	return collectRoles(input, func(item gjson.Result) (string, string) {
-		itemType := item.Get("type").String()
-		if role := item.Get("role").String(); role != "" {
-			return normalizeRoleName(role), itemType
-		}
-		return responsesRoleFromType(itemType), itemType
-	})
+	return text
 }
 
 // responsesRoleFromType 推断 Responses 里不带 role 的项属于谁。
@@ -255,50 +220,6 @@ func responsesRoleFromType(itemType string) string {
 	default:
 		return RoleUnknown
 	}
-}
-
-func rolesFromGeminiContents(contents gjson.Result) []RoleRef {
-	return collectRoles(contents, func(item gjson.Result) (string, string) {
-		role := strings.ToLower(strings.TrimSpace(item.Get("role").String()))
-		if role == "" {
-			// Gemini 省略 role 时按官方语义就是 user。
-			return RoleUser, ""
-		}
-		return normalizeRoleName(role), ""
-	})
-}
-
-func geminiSystemInstruction(body []byte) string {
-	var system string
-	for _, key := range []string{"systemInstruction", "system_instruction"} {
-		if node := gjson.GetBytes(body, key); node.Exists() {
-			system = joinNonEmpty(system, flattenGeminiParts(node.Get("parts")))
-		}
-	}
-	return system
-}
-
-// rolesFromGenericBody 是未知协议的兜底：认得出哪个数组是对话就标注它。
-func rolesFromGenericBody(body []byte) []RoleRef {
-	for _, key := range []string{"messages", "contents", "input"} {
-		if node := gjson.GetBytes(body, key); node.IsArray() {
-			return rolesFromRoleBearingArray(node)
-		}
-	}
-	return nil
-}
-
-func collectRoles(array gjson.Result, classify func(gjson.Result) (role, itemType string)) []RoleRef {
-	if !array.IsArray() {
-		return nil
-	}
-	items := array.Array()
-	roles := make([]RoleRef, 0, len(items))
-	for i, item := range items {
-		role, itemType := classify(item)
-		roles = append(roles, RoleRef{Index: i, Role: role, Type: itemType})
-	}
-	return roles
 }
 
 // normalizeRoleName 把各协议的角色名收敛到统一取值。空值返回 unknown 而不是

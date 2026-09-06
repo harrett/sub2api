@@ -45,73 +45,79 @@ Bedrock / Grok 全部上游，无需在每个 forward 分支里埋点。
 {
   "schema_version": 2,
   "request_id": "req_...",
-  "created_at": "2026-09-04T10:00:00Z",
+  "created_at": "2026-09-06T10:00:00Z",
   "duration_ms": 4210,
   "status_code": 200,
   "stream": true,
-  "endpoint": "/v1/messages",
-  "protocol": "anthropic_messages",
+  "endpoint": "/v1/responses",
+  "protocol": "openai_responses",
   "identity": {
     "user_id": 12, "user_email": "a@b.c",
     "api_key_id": 34, "api_key_name": "cli",
-    "group_id": 5, "group_name": "claude-pool",
-    "account_id": 78, "account_name": "acct-3", "platform": "anthropic"
+    "group_id": 5, "group_name": "codex-pool",
+    "account_id": 78, "platform": "openai"
   },
-  "model": { "requested": "claude-opus-4-5", "upstream": "...", "response": "..." },
+  "model": { "requested": "gpt-5.6-luna", "upstream": "...", "response": "..." },
   "conversation": {
-    "system": "...",
-    "roles": [
-      { "i": 0, "role": "user" },
-      { "i": 1, "role": "assistant", "type": "reasoning" },
-      { "i": 2, "role": "tool", "type": "custom_tool_call_output" }
-    ],
-    "tools": [ ... ],
+    "input": "本轮用户真正打出来的那句话（原文，未截断）",
     "output": {
       "role": "assistant",
-      "content": [ { "type": "text", "text": "..." } ],
-      "tool_calls": [ ... ],
-      "stop_reason": "end_turn",
-      "truncated": false
+      "text": "...", "thinking": "...", "tool_calls": [ ... ],
+      "stop_reason": "completed", "truncated": false
     }
   },
-  "usage": { "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0 },
-  "raw_request": { ... }
+  "usage": { "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0 }
 }
 ```
 
-`raw_request` 是对话正文的**唯一一份**（已脱敏）；`conversation` 只放 raw_request 缺的东西：
-跨协议归一化的 system、逐项角色索引、聚合后的模型输出。**原始响应流不落盘** ——
-SSE 冗余约 3~5x，归一化输出已覆盖训练需要。
+这是默认的 `capture_scope: essential`。`capture_scope: full` 时改为携带脱敏后的整个
+`raw_request` 加一份 `conversation.roles` 角色索引，只在需要 agent 轨迹蒸馏时开启。
 
-### 为什么 v2 去掉了 conversation.messages
+### 为什么默认只存一轮的用户输入与模型输出
 
-v1 同时存"归一化 messages"与"原始 raw_request"，但四种协议下归一化几乎都是恒等映射，
-于是每条记录把同一份对话存了两遍。生产抽样实测：单条 1.19MB 里 47% 是逐字副本（77 项中
-76 项完全相同），而 gzip 的 32KB 滑窗够不到 540KB 外的重复块，压缩救不回来——gzip 后
-仍是 339KB 对 174KB，实打实 2x。
+两个目标只需要这些：追溯用户输入、以及"用户输入 → 模型输出"的蒸馏样本。系统提示、
+工具定义、注入上下文都是同一客户端每个请求里逐字相同的样板，没有信息量。
 
-同时 v1 的角色是错的：Responses 的 input 项里大多数不带 `role`（reasoning、`*_call`、
-`*_output`），旧代码统一兜底成 `user`，导致一条只有 2 句真实用户输入的 Codex 会话被标成
-65 条 user。这种语料会让模型学到"工具输出是用户说的话"。
+更关键的是历史：agent 客户端每轮都把整段对话重发一次（抽样里一个请求 98% 的
+input token 是缓存命中），所以按请求存全量等于单会话 O(n²)。而历史里的助手回复早已由
+前几条记录各自的 `output` 存过，用户的历史输入也早已由它们各自那一轮存过——留下的
+只是同一份内容被抄了 N 遍。
 
-v2 因此改为：正文只留 raw_request，`conversation.roles` 按下标补上可靠角色，识别不了的
-项标 `unknown` 而不是猜一个。同一条抽样：1,192KB → 512KB（gzip 347KB → 120KB，小 66%），
-角色分布由 `user×65` 修正为 `user×2 / assistant×49 / tool×20 / developer×6`。
+**为什么取"最后一条"用户输入**：客户端注入的内容（系统提示、压缩检查点、运行时快照、
+技能目录）总是排在真人那句之前，两份生产抽样都如此；取最后一条既能避开注入，又与列表
+预览天然一致。更早的真实用户输入不会丢——它们各自曾是所属那一轮请求的"最后一条"。
 
-`encrypted_content`（上游 reasoning 附带的不透明密文，抽样里占 64KB / 5.4%）在落盘前整段
-删除——人和模型都读不了它。请求参数 `include: ["reasoning.encrypted_content"]` 是合法元数据，保留。
+按 role 裁剪则**不可行**：抽样 2 的客户端（DeepSeek Harness）把系统提示、压缩历史、
+运行时快照全塞进 `role: "user"`，97.4% 的字节都是 user，而真人只打了 59 字节。
+
+两份生产抽样实测：
+
+| 抽样 | 协议 | 原始 | v2 essential | gzip |
+|---|---|---|---|---|
+| 1（Codex agent，77 项 input） | responses | 1,192,656 | 5,716（-99.5%） | 346,836 → 2,498 |
+| 2（DeepSeek Harness） | chat | 667,434 | 666（-99.9%） | 132,794 → 426 |
+
+`encrypted_content`（上游 reasoning 附带的不透明密文，抽样 1 里占 64KB / 5.4%）在落盘前
+整段删除——人和模型都读不了它。
 
 ### 协议归一化
 
-| protocol | 请求 | 响应（非流式） | 响应（SSE） |
+| protocol | 用户输入（从后往前找最近一条真实用户文本） | 响应（非流式） | 响应（SSE） |
 |---|---|---|---|
-| `anthropic_messages` | `system` + `messages[].role` + `tools[]` | `content[]` / `stop_reason` | `content_block_delta.delta.{text,thinking,partial_json}` + `message_delta` |
-| `openai_chat` | `messages[].role`（system/developer 提到 `system`）+ `tools[]` | `choices[0].message` | `choices[0].delta.{content,tool_calls}` |
-| `openai_responses` | `instructions` + `input[]` + `tools[]` | `output[]` | `response.output_text.delta`，终帧 `response.completed.response` 优先 |
-| `gemini_generate` | `systemInstruction` + `contents[]` + `tools[]` | `candidates[0].content.parts[]` | 逐帧 `candidates[0].content.parts[]` 累加 |
+| `anthropic_messages` | `messages[]` 中 `role=user` 的文本块 | `content[]` / `stop_reason` | `content_block_delta.delta.{text,thinking,partial_json}` + `message_delta` |
+| `openai_chat` | `messages[]` 中 `role=user` 的文本 | `choices[0].message` | `choices[0].delta.{content,tool_calls}` |
+| `openai_responses` | `input[]` 中 `role=user` 项的 `input_text` | `output[]` | `response.output_text.delta`，终帧 `response.completed.response` 优先 |
+| `gemini_generate` | `contents[]` 中 `role=user`（缺省即 user）的 `parts[].text` | `candidates[0].content.parts[]` | 逐帧 `candidates[0].content.parts[]` 累加 |
 
-无法识别的协议走通用兜底：请求原样进 `raw_request`，响应尝试通用 delta 字段收集。
-响应缓冲被截断时置 `output.truncated = true`。
+从后往前扫是必须的：agent 流量的最后一项几乎总是 `tool_result` / `function_call_output` /
+`reasoning`，只看最后一个元素会得到空串——这正是列表里出现"（无文本输入）"而全文里明明
+有用户输入的原因。
+
+命中的文本还要过一遍注入内容过滤（`<system-reminder>`、Codex 安全策略文档、会话压缩
+检查点、运行时快照）：这些以 `role=user` 发出但不是人打的，混进语料会让风控看错人。
+
+无法识别的协议走通用兜底：按 `messages` / `contents` / `input` 依次尝试，响应侧收集通用
+delta 字段。响应缓冲被截断时置 `output.truncated = true`。
 
 ## 4. 有界队列与降级
 

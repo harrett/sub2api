@@ -310,6 +310,12 @@ func normalizeSettings(in *Settings) {
 		in.Prefix += "/"
 	}
 
+	// 无法识别的取值一律回落到 essential：配置写错时应该少存，而不是把
+	// 完整系统提示与重发历史悄悄写进对象存储。
+	if in.CaptureScope != ScopeFull {
+		in.CaptureScope = ScopeEssential
+	}
+
 	if in.SampleRate <= 0 || in.SampleRate > 1 {
 		in.SampleRate = 1
 	}

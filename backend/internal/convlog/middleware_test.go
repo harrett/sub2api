@@ -16,9 +16,13 @@ import (
 )
 
 func newTestService(t *testing.T, enabled bool) *Service {
+	return newScopedTestService(t, enabled, ScopeEssential)
+}
+
+func newScopedTestService(t *testing.T, enabled bool, scope string) *Service {
 	t.Helper()
 	spool := newTestSpool(t, nil)
-	settings := &Settings{Enabled: enabled}
+	settings := &Settings{Enabled: enabled, CaptureScope: scope}
 	normalizeSettings(settings)
 	return &Service{
 		spool:    spool,
@@ -127,12 +131,14 @@ func TestMiddlewareEnqueuesNormalizedRecord(t *testing.T) {
 	require.Equal(t, RecordSchemaVersion, record.SchemaVersion)
 	require.NotNil(t, record.Conversation.Output)
 	require.Equal(t, "like this", record.Conversation.Output.Text)
-	require.Equal(t, []RoleRef{{Index: 0, Role: RoleUser}}, record.Conversation.Roles)
-	require.NotNil(t, record.RawRequest)
+	require.Equal(t, "how do I ship it", record.Conversation.Input)
+	// 默认范围只留用户输入与模型输出，整段请求不落盘。
+	require.Nil(t, record.RawRequest)
+	require.Empty(t, record.Conversation.Roles)
 }
 
-// 落盘前必须脱敏：请求体里的凭证不能出现在 JSONL 里。
-func TestMiddlewareRedactsCredentialsBeforeQueueing(t *testing.T) {
+// 默认范围下凭证根本不会抵达磁盘：整段请求都不落盘，比脱敏更强。
+func TestMiddlewareEssentialScopeNeverWritesRequestBody(t *testing.T) {
 	svc := newTestService(t, true)
 	payload := `{"messages":[{"role":"user","content":"hi"}],"api_key":"sk-live-secret"}`
 
@@ -144,7 +150,29 @@ func TestMiddlewareRedactsCredentialsBeforeQueueing(t *testing.T) {
 
 	rec := <-svc.sink.queue
 	require.NotContains(t, string(rec.line), "sk-live-secret")
+}
+
+// ScopeFull 会落完整请求，所以那条路径必须真的做脱敏。
+func TestMiddlewareRedactsCredentialsInFullScope(t *testing.T) {
+	svc := newScopedTestService(t, true, ScopeFull)
+	payload := `{"messages":[{"role":"user","content":"hi"}],"api_key":"sk-live-secret"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+
+	runCaptureRequest(t, svc, req, func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+	rec := <-svc.sink.queue
+	require.NotContains(t, string(rec.line), "sk-live-secret")
 	require.Contains(t, string(rec.line), redactedPlaceholder)
+	require.Equal(t, []RoleRef{{Index: 0, Role: RoleUser}}, jsonRecord(t, rec.line).Conversation.Roles)
+}
+
+func jsonRecord(t *testing.T, line []byte) Record {
+	t.Helper()
+	var record Record
+	require.NoError(t, json.Unmarshal(line, &record))
+	return record
 }
 
 // 响应缓冲达上限后仍要放行写出，只是把记录标记为截断。

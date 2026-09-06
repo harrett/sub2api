@@ -3,6 +3,8 @@ import { apiClient } from '../client'
 export interface ConversationCaptureSettings {
   enabled: boolean
   reuse_backup_s3: boolean
+  /** essential = 只留本轮用户输入与模型输出；full = 保留脱敏后的完整请求 */
+  capture_scope: 'essential' | 'full'
   sample_rate: number
   excluded_group_ids: number[]
   bucket: string

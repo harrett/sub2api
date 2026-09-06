@@ -184,6 +184,18 @@
             </label>
           </template>
 
+          <div class="md:col-span-2">
+            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.scope') }}</label>
+            <select v-model="captureForm.capture_scope" class="input w-full">
+              <option value="essential">{{ t('admin.backup.conversationCapture.scopeEssential') }}</option>
+              <option value="full">{{ t('admin.backup.conversationCapture.scopeFull') }}</option>
+            </select>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ captureForm.capture_scope === 'full'
+                ? t('admin.backup.conversationCapture.scopeFullHint')
+                : t('admin.backup.conversationCapture.scopeEssentialHint') }}
+            </p>
+          </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.conversationCapture.previewBytes') }}</label>
             <input v-model.number="captureForm.preview_bytes" type="number" min="64" max="2048" class="input w-full" />
@@ -604,6 +616,7 @@ const testingImageStorage = ref(false)
 const captureForm = ref<ConversationCaptureSettings>({
   enabled: false,
   reuse_backup_s3: true,
+  capture_scope: 'essential',
   sample_rate: 1,
   excluded_group_ids: [],
   bucket: '',
