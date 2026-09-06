@@ -53,6 +53,9 @@ func conversationKeys(protocol string) []string {
 		return []string{"contents"}
 	case ProtocolAnthropicMessages, ProtocolOpenAIChat:
 		return []string{"messages"}
+	case ProtocolOpenAIImages:
+		// 生图请求没有对话数组，prompt 就是全部输入。
+		return nil
 	default:
 		return []string{"messages", "input", "contents"}
 	}

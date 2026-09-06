@@ -18,6 +18,7 @@ const (
 	ProtocolOpenAIChat        = "openai_chat"
 	ProtocolOpenAIResponses   = "openai_responses"
 	ProtocolGeminiGenerate    = "gemini_generate"
+	ProtocolOpenAIImages      = "openai_images"
 	ProtocolUnknown           = "unknown"
 
 	// RecordSchemaVersion 随记录 schema 的不兼容变更递增，训练侧按此分流。
@@ -191,7 +192,9 @@ type Record struct {
 	ThreadID string `json:"thread_id,omitempty"`
 	// Continuation 为真表示本轮是 agent 循环续跑，用户没有新提问：Input 与上一条
 	// 相同，Output 回应的是工具结果而不是那句用户输入。取 (指令, 回答) 样本时排除。
-	Continuation bool      `json:"continuation,omitempty"`
+	// 不用 omitempty：false 与"这个版本没写这个字段"必须能区分，否则训练侧
+	// 无法判断一条没有该字段的记录到底是不是续跑。
+	Continuation bool      `json:"continuation"`
 	CreatedAt    time.Time `json:"created_at"`
 	DurationMs   int       `json:"duration_ms"`
 	StatusCode   int       `json:"status_code"`
@@ -265,23 +268,26 @@ type SearchFilter struct {
 
 // RuntimeStats 是后台运行态面板的数据源。
 type RuntimeStats struct {
-	Enabled            bool   `json:"enabled"`
-	Degraded           bool   `json:"degraded"`
-	DegradedReason     string `json:"degraded_reason,omitempty"`
-	QueueDepth         int    `json:"queue_depth"`
-	QueueCapacity      int    `json:"queue_capacity"`
-	QueueBytes         int64  `json:"queue_bytes"`
-	QueueMaxBytes      int64  `json:"queue_max_bytes"`
-	DroppedTotal       uint64 `json:"dropped_total"`
-	CapturedTotal      uint64 `json:"captured_total"`
-	SpooledTotal       uint64 `json:"spooled_total"`
-	SpoolBytes         int64  `json:"spool_bytes"`
-	SpoolMaxBytes      int64  `json:"spool_max_bytes"`
-	DiskFreeBytes      int64  `json:"disk_free_bytes"`
-	PendingUploads     int    `json:"pending_uploads"`
-	UploadedTotal      uint64 `json:"uploaded_total"`
-	UploadFailedTotal  uint64 `json:"upload_failed_total"`
-	IndexWriteFailed   uint64 `json:"index_write_failed_total"`
+	Enabled           bool   `json:"enabled"`
+	Degraded          bool   `json:"degraded"`
+	DegradedReason    string `json:"degraded_reason,omitempty"`
+	QueueDepth        int    `json:"queue_depth"`
+	QueueCapacity     int    `json:"queue_capacity"`
+	QueueBytes        int64  `json:"queue_bytes"`
+	QueueMaxBytes     int64  `json:"queue_max_bytes"`
+	DroppedTotal      uint64 `json:"dropped_total"`
+	CapturedTotal     uint64 `json:"captured_total"`
+	SpooledTotal      uint64 `json:"spooled_total"`
+	SpoolBytes        int64  `json:"spool_bytes"`
+	SpoolMaxBytes     int64  `json:"spool_max_bytes"`
+	DiskFreeBytes     int64  `json:"disk_free_bytes"`
+	PendingUploads    int    `json:"pending_uploads"`
+	UploadedTotal     uint64 `json:"uploaded_total"`
+	UploadFailedTotal uint64 `json:"upload_failed_total"`
+	IndexWriteFailed  uint64 `json:"index_write_failed_total"`
+	// SkippedNoOutput 是"失败且模型无输出"而未留存的请求数，用来解释为什么
+	// 捕获量远小于网关请求量。
+	SkippedNoOutput    uint64 `json:"skipped_no_output_total"`
 	LastError          string `json:"last_error,omitempty"`
 	ObjectStoreEnabled bool   `json:"object_store_enabled"`
 }

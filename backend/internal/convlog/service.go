@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -58,6 +59,8 @@ type Service struct {
 	current          *Settings
 	currentS3        *S3Config
 	storeFingerprint string
+
+	skippedNoOutput atomic.Uint64
 
 	lifecycle sync.Mutex
 	cancel    context.CancelFunc
@@ -292,6 +295,14 @@ func (s *Service) Capture(input CaptureInput) {
 
 	protocol := DetectProtocol(input.Endpoint, input.RequestBody)
 	aggregate := AggregateResponse(protocol, input.ResponseBody, input.ResponseTruncated)
+
+	// 失败且模型什么都没输出的请求不留存。生产一小时的实测里这类占了 79% 的字节：
+	// 608 条 503/429/404，其中 596 条根本没绑定到上游账号——既没有可蒸馏的输出，
+	// 也不构成账号封禁风险，而客户端重试又会把同一份输入反复写进来。
+	if input.StatusCode >= 400 && aggregate.Output.IsEmpty() {
+		s.skippedNoOutput.Add(1)
+		return
+	}
 	// 响应侧同样要清洗：上游把 reasoning 的密文也回写在 output 里。
 	aggregate.Output.Content = redactJSON(aggregate.Output.Content)
 
@@ -455,6 +466,7 @@ func (s *Service) Runtime() RuntimeStats {
 		UploadedTotal:      uploaded,
 		UploadFailedTotal:  uploadFailed,
 		IndexWriteFailed:   indexFailed,
+		SkippedNoOutput:    s.skippedNoOutput.Load(),
 		ObjectStoreEnabled: s.uploader.currentStore() != nil,
 		LastError:          firstNonEmpty(uploadErr, spoolErr),
 	}

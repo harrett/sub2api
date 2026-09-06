@@ -31,6 +31,13 @@ func AggregateResponse(protocol string, body []byte, truncated bool) AggregateRe
 	return result
 }
 
+// IsEmpty 判断模型什么都没输出。用于跳过失败请求：网关自身的 503/429/404
+// 根本没到过上游，既没有可蒸馏的输出，也不构成账号封禁风险。
+func (o *Output) IsEmpty() bool {
+	return o == nil || (strings.TrimSpace(o.Text) == "" && strings.TrimSpace(o.Thinking) == "" &&
+		len(o.ToolCalls) == 0 && o.Content == nil)
+}
+
 // isSSE 判断响应体是否为 Server-Sent Events。非流式响应是单个 JSON 文档，
 // 首个非空白字节必为 '{' 或 '['。
 func isSSE(body []byte) bool {
@@ -235,10 +242,40 @@ func aggregateJSON(protocol string, body []byte, result *AggregateResult) {
 		result.Output.Content = decodeJSON(parts.Raw)
 		result.Output.Text = flattenGeminiParts(parts)
 		applyGeminiUsage(gjson.GetBytes(body, "usageMetadata"), &result.Usage)
+	case ProtocolOpenAIImages:
+		aggregateImagesResponse(body, result)
 	default:
 		result.ResponseModel = gjson.GetBytes(body, "model").String()
 		result.Output.Content = decodeJSON(string(body))
 	}
+}
+
+// aggregateImagesResponse 只记生图结果的元信息。响应里的 b64_json 是整张图片，
+// 单条能到 MB 级——若走通用兜底把整个 body 塞进 Content，对象存储会被图片撑爆。
+func aggregateImagesResponse(body []byte, result *AggregateResult) {
+	summary := map[string]any{}
+	var images []any
+	gjson.GetBytes(body, "data").ForEach(func(_, item gjson.Result) bool {
+		entry := map[string]any{}
+		if revised := item.Get("revised_prompt").String(); revised != "" {
+			entry["revised_prompt"] = revised
+		}
+		if url := item.Get("url").String(); url != "" {
+			entry["url"] = url
+		}
+		images = append(images, entry)
+		return true
+	})
+	if len(images) > 0 {
+		summary["images"] = images
+	}
+	if size := gjson.GetBytes(body, "size").String(); size != "" {
+		summary["size"] = size
+	}
+	if len(summary) > 0 {
+		result.Output.Content = summary
+	}
+	applyResponsesUsage(gjson.GetBytes(body, "usage"), &result.Usage)
 }
 
 func flattenAnthropicContentText(content gjson.Result) string {

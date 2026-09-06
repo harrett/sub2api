@@ -22,6 +22,8 @@ func DetectProtocol(endpoint string, body []byte) string {
 		return ProtocolAnthropicMessages
 	case strings.Contains(path, "generatecontent"), strings.Contains(path, "/v1beta/"):
 		return ProtocolGeminiGenerate
+	case strings.Contains(path, "/images/"):
+		return ProtocolOpenAIImages
 	}
 	if !gjson.ValidBytes(body) {
 		return ProtocolUnknown
@@ -74,6 +76,10 @@ func lastUserText(protocol string, body []byte) string {
 		return lastUserTextFromResponsesInput(gjson.GetBytes(body, "input"))
 	case ProtocolGeminiGenerate:
 		return lastUserTextFromGeminiContents(gjson.GetBytes(body, "contents"))
+	case ProtocolOpenAIImages:
+		// 生图端点没有对话数组，用户输入就是 prompt。漏掉它等于让风控对生图
+		// 完全失明——而生图恰恰是常见的滥用面。
+		return sanitizeUserText(gjson.GetBytes(body, "prompt").String())
 	default:
 		// 协议识别失败时挨个试，任何一个能取到就用它。
 		for _, candidate := range []string{
@@ -175,9 +181,10 @@ func userTextFromContent(content gjson.Result) string {
 // <environment_details>（含每轮都变的时间戳）。整条丢会丢掉用户输入，整条留会把
 // 时间戳噪音写进语料，所以必须只挖掉标签块、留下人写的部分。
 var injectedBlockTags = []string{
-	"system-reminder",      // Claude Code
-	"environment_details",  // Cline / Roo / KFlash 系客户端
-	"workspace_attachment", // AIDE 系客户端：附着工作区的文件树与变更清单
+	"system-reminder",        // Claude Code
+	"environment_details",    // Cline / Roo / KFlash 系客户端
+	"workspace_attachment",   // AIDE 系客户端：附着工作区的文件树与变更清单
+	"codex_internal_context", // Codex 的目标续跑指令，整块都是机器生成的
 }
 
 // injectedBlockPatterns 匹配成对标签及其内容；dangling 匹配没有闭合标签的残缺块

@@ -41,6 +41,9 @@ var sensitiveJSONKeys = map[string]struct{}{
 // 里就有 64KB，占该记录的 5.4%，而人和模型都永远读不了它。
 var droppedJSONKeys = map[string]struct{}{
 	"encrypted_content": {},
+	// 生图响应把整张图以 base64 塞在 b64_json 里，单条能到 MB 级；
+	// 对风控和蒸馏都没有价值，绝不能进对象存储。
+	"b64_json": {},
 }
 
 // redactJSON 递归清洗 JSON 值：凭证字段替换成占位符，不透明字段整段删除。
