@@ -29,6 +29,7 @@ const retentionPeriod = 6 * time.Hour
 // CaptureInput 是中间件交给捕获管线的一次请求全貌。
 type CaptureInput struct {
 	RequestID         string
+	SessionID         string
 	StartedAt         time.Time
 	Duration          time.Duration
 	StatusCode        int
@@ -307,6 +308,7 @@ func (s *Service) Capture(input CaptureInput) {
 	record := Record{
 		SchemaVersion: RecordSchemaVersion,
 		RequestID:     input.RequestID,
+		SessionID:     resolveSessionID(input.SessionID, input.RequestBody),
 		CreatedAt:     input.StartedAt.UTC(),
 		DurationMs:    int(input.Duration / time.Millisecond),
 		StatusCode:    input.StatusCode,
@@ -332,6 +334,7 @@ func (s *Service) Capture(input CaptureInput) {
 
 	row := IndexRow{
 		RequestID:    input.RequestID,
+		SessionID:    record.SessionID,
 		CreatedAt:    record.CreatedAt,
 		UserID:       optionalID(input.Identity.UserID),
 		APIKeyID:     optionalID(input.Identity.APIKeyID),

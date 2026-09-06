@@ -397,17 +397,22 @@ func (s *Spool) refreshDiskState() {
 
 	free := diskFreeBytes(s.dir)
 	s.diskFree.Store(free)
+	s.diskState.Store(int32(evaluateDiskState(free, s.spoolBytes.Load(), options)))
+}
 
-	state := DiskOK
+// evaluateDiskState 是水位判定的纯函数，便于脱离真实磁盘做测试。
+// free 为负表示取不到（Windows），此时只按 spool 总量判断，不能误判为告急。
+func evaluateDiskState(free, spoolBytes int64, options SpoolOptions) DiskState {
 	switch {
 	case free >= 0 && free < options.DiskCriticalFreeBytes:
-		state = DiskCritical
+		return DiskCritical
 	case free >= 0 && free < options.DiskMinFreeBytes:
-		state = DiskSpoolFull
-	case s.spoolBytes.Load() >= options.SpoolMaxBytes:
-		state = DiskSpoolFull
+		return DiskSpoolFull
+	case spoolBytes >= options.SpoolMaxBytes:
+		return DiskSpoolFull
+	default:
+		return DiskOK
 	}
-	s.diskState.Store(int32(state))
 }
 
 func (s *Spool) recordError(err error) {

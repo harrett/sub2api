@@ -89,6 +89,15 @@
       </div>
     </div>
 
+    <!-- Active session filter -->
+    <div v-if="filters.sessionId" class="card flex flex-wrap items-center gap-2 p-3 text-sm">
+      <span class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.search.sessionFilter') }}</span>
+      <code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs dark:bg-gray-800">{{ filters.sessionId }}</code>
+      <button type="button" class="btn btn-secondary btn-xs" @click="clearSessionFilter">
+        {{ t('admin.conversationCapture.search.clearSession') }}
+      </button>
+    </div>
+
     <!-- Results -->
     <div class="card p-0">
       <div v-if="!records.length" class="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -193,6 +202,15 @@
                 <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.platform') }}</dt>
                 <dd class="font-medium text-gray-900 dark:text-gray-100">{{ fullRecordTarget.platform || '-' }}</dd>
               </div>
+              <div v-if="fullRecordTarget.session_id" class="flex min-w-0 gap-1">
+                <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.session') }}</dt>
+                <dd class="flex min-w-0 items-center gap-2">
+                  <span class="truncate font-mono text-gray-700 dark:text-gray-300">{{ fullRecordTarget.session_id }}</span>
+                  <button type="button" class="btn btn-secondary btn-xs shrink-0" @click="searchSession(fullRecordTarget.session_id)">
+                    {{ t('admin.conversationCapture.full.viewSession') }}
+                  </button>
+                </dd>
+              </div>
               <div class="flex min-w-0 gap-1">
                 <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.conversationCapture.full.requestId') }}</dt>
                 <dd class="truncate font-mono text-gray-700 dark:text-gray-300">{{ fullRecordTarget.request_id }}</dd>
@@ -279,6 +297,7 @@ const filters = reactive({
   start: '',
   end: '',
   keyword: '',
+  sessionId: '',
 })
 
 // datetime-local 用的是本地时间字符串，没有时区后缀，需要手工转换两次。
@@ -342,6 +361,7 @@ async function search(): Promise<void> {
       start: new Date(filters.start).toISOString(),
       end: new Date(filters.end).toISOString(),
       keyword: filters.keyword.trim() || undefined,
+      session_id: filters.sessionId.trim() || undefined,
     })
     records.value = result.records ?? []
     summary.value = result.summary ?? null
@@ -369,6 +389,19 @@ async function openFull(record: ConversationCaptureRecord): Promise<void> {
   } finally {
     fullRecordLoading.value = false
   }
+}
+
+// 单条记录只存本轮，上下文靠同一会话的相邻记录重建——所以从全文弹窗
+// 一键跳到"这个会话的全部轮次"是主要的追溯动线。
+async function searchSession(sessionId: string): Promise<void> {
+  filters.sessionId = sessionId
+  fullRecordOpen.value = false
+  await search()
+}
+
+async function clearSessionFilter(): Promise<void> {
+  filters.sessionId = ''
+  await search()
 }
 
 async function banUser(record: ConversationCaptureRecord): Promise<void> {

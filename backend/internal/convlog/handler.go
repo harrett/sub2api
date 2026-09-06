@@ -109,6 +109,7 @@ type searchEcho struct {
 	Start     time.Time `json:"start"`
 	End       time.Time `json:"end"`
 	Keyword   string    `json:"keyword,omitempty"`
+	SessionID string    `json:"session_id,omitempty"`
 	Limit     int       `json:"limit"`
 }
 
@@ -137,6 +138,7 @@ func (h *AdminHandler) SearchRecords(c *gin.Context) {
 			Start:     filter.Start,
 			End:       filter.End,
 			Keyword:   filter.Keyword,
+			SessionID: filter.SessionID,
 			Limit:     filter.Limit,
 		},
 	})
@@ -173,7 +175,7 @@ func (h *AdminHandler) settingStore() *SettingStore {
 }
 
 func parseSearchFilter(c *gin.Context) (SearchFilter, error) {
-	filter := SearchFilter{Keyword: c.Query("keyword")}
+	filter := SearchFilter{Keyword: c.Query("keyword"), SessionID: c.Query("session_id")}
 
 	accountID, err := strconv.ParseInt(strings.TrimSpace(c.Query("account_id")), 10, 64)
 	if err != nil || accountID <= 0 {

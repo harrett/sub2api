@@ -2,6 +2,7 @@ package convlog
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -169,22 +170,74 @@ func userTextFromContent(content gjson.Result) string {
 	}
 }
 
-// injectedContentMarkers 是客户端注入内容的特征串。这些内容以 role=user 发出，
-// 但不是人打的——某些客户端（DeepSeek Harness）97% 的 user 字节都是这类东西。
-// 把它们当成用户输入会让风控看错人，也会让蒸馏语料被样板文本淹没。
+// injectedBlockTags 是客户端**追加在用户消息内部**的成对标签。这类注入不能整条丢弃：
+// 抽样 3 里用户真正打的是"进行修复"，客户端在同一条消息后面接了一整块
+// <environment_details>（含每轮都变的时间戳）。整条丢会丢掉用户输入，整条留会把
+// 时间戳噪音写进语料，所以必须只挖掉标签块、留下人写的部分。
+var injectedBlockTags = []string{
+	"system-reminder",     // Claude Code
+	"environment_details", // Cline / Roo / KFlash 系客户端
+}
+
+// injectedBlockPatterns 匹配成对标签及其内容；dangling 匹配没有闭合标签的残缺块
+// （被上游截断时会出现），从开标签处一路截掉，避免注入内容泄进语料。
+var (
+	injectedBlockPatterns = compileInjectedBlockPatterns()
+	danglingBlockPatterns = compileDanglingBlockPatterns()
+)
+
+// 连同标签两侧的水平空白一起吃掉，避免挖走块之后在行内留下双空格。
+// 只吃空格与制表符，不碰换行——用户输入里的代码缩进必须原样保留。
+func compileInjectedBlockPatterns() []*regexp.Regexp {
+	out := make([]*regexp.Regexp, 0, len(injectedBlockTags))
+	for _, tag := range injectedBlockTags {
+		out = append(out, regexp.MustCompile(`(?is)[ \t]*<`+tag+`\b[^>]*>.*?</`+tag+`\s*>[ \t]*`))
+	}
+	return out
+}
+
+func compileDanglingBlockPatterns() []*regexp.Regexp {
+	out := make([]*regexp.Regexp, 0, len(injectedBlockTags))
+	for _, tag := range injectedBlockTags {
+		out = append(out, regexp.MustCompile(`(?is)[ \t]*<`+tag+`\b[^>]*>.*\z`))
+	}
+	return out
+}
+
+var (
+	blankLinePattern       = regexp.MustCompile(`(?m)^[ \t]+$`)
+	repeatedNewlinePattern = regexp.MustCompile(`\n{3,}`)
+)
+
+// injectedContentMarkers 是**整条消息都是注入内容**时的特征串。与上面的成对标签不同，
+// 这些注入不带包裹标签，只能整条识别；某些客户端（DeepSeek Harness）97% 的 user
+// 字节都是这类东西。把它们当成用户输入会让风控看错人，也会让蒸馏语料被样板淹没。
 var injectedContentMarkers = []string{
-	// Claude Code / Codex 注入的上下文提醒
-	"<system-reminder>",
 	// 会话压缩检查点：客户端自动生成的历史摘要
 	"This is an automatically generated checkpoint condensing an earlier span of the conversation",
 	// 运行时上下文快照，每轮重发
 	"Current runtime context. This snapshot supersedes earlier runtime-context snapshots",
 }
 
+// stripInjectedBlocks 挖掉用户消息内部的注入块，保留人写的部分。
+//
+// 块被替换成单个空格而不是直接删除：行内注入（"before <env>…</env> after"）
+// 删干净会把两个词粘在一起。之后再收拾挖块留下的空白行。
+func stripInjectedBlocks(text string) string {
+	for _, pattern := range injectedBlockPatterns {
+		text = pattern.ReplaceAllString(text, " ")
+	}
+	for _, pattern := range danglingBlockPatterns {
+		text = pattern.ReplaceAllString(text, " ")
+	}
+	text = blankLinePattern.ReplaceAllString(text, "")
+	return repeatedNewlinePattern.ReplaceAllString(text, "\n\n")
+}
+
 // sanitizeUserText 丢掉平台自己注入的上下文块，只留真正的用户输入，
 // 并保留原始换行——训练要的是用户实际打出来的样子。
 func sanitizeUserText(text string) string {
-	text = strings.TrimSpace(text)
+	text = strings.TrimSpace(stripInjectedBlocks(text))
 	if text == "" {
 		return ""
 	}

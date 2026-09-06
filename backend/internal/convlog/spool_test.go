@@ -165,16 +165,34 @@ func TestSpoolPausesWhenOverCapacity(t *testing.T) {
 	require.ErrorIs(t, err, ErrSpoolPaused)
 }
 
-func TestSpoolDiskGuardWatermarks(t *testing.T) {
-	spool := newTestSpool(t, nil)
+// 水位判定必须与真实磁盘解耦：早先这个测试走 SetOptions，会重新读宿主机剩余空间，
+// 于是在磁盘偏紧的开发机上莫名其妙地失败。
+func TestEvaluateDiskStateWatermarks(t *testing.T) {
+	options := SpoolOptions{
+		SpoolMaxBytes:         1 << 30,
+		DiskMinFreeBytes:      8 << 30,
+		DiskCriticalFreeBytes: 5 << 30,
+	}
 
-	// 磁盘余量取不到（-1，例如 Windows）时不应误判为告急。
-	spool.diskFree.Store(-1)
-	spool.SetOptions(SpoolOptions{
-		Prefix: "p/", RotateBytes: 1 << 20, RotateInterval: time.Hour,
-		SpoolMaxBytes: 1 << 30, DiskMinFreeBytes: 8 << 30, DiskCriticalFreeBytes: 5 << 30,
-	})
-	require.NotEqual(t, DiskCritical, spool.DiskState())
+	cases := []struct {
+		name       string
+		free       int64
+		spoolBytes int64
+		want       DiskState
+	}{
+		{"plenty of room", 100 << 30, 0, DiskOK},
+		{"below min free stops spooling", 6 << 30, 0, DiskSpoolFull},
+		{"below critical stops capture", 1 << 30, 0, DiskCritical},
+		{"spool at cap stops spooling", 100 << 30, 1 << 30, DiskSpoolFull},
+		// 取不到剩余空间（Windows 返回 -1）时只按 spool 总量判断，不能误判为告急。
+		{"unknown free is not critical", -1, 0, DiskOK},
+		{"unknown free still honors spool cap", -1, 2 << 30, DiskSpoolFull},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, evaluateDiskState(tc.free, tc.spoolBytes, options))
+		})
+	}
 }
 
 func TestBuildObjectKeyPartitions(t *testing.T) {

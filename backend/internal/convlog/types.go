@@ -182,16 +182,19 @@ type Usage struct {
 
 // Record 是落盘 JSONL 的一行。
 type Record struct {
-	SchemaVersion int       `json:"schema_version"`
-	RequestID     string    `json:"request_id"`
-	CreatedAt     time.Time `json:"created_at"`
-	DurationMs    int       `json:"duration_ms"`
-	StatusCode    int       `json:"status_code"`
-	Stream        bool      `json:"stream"`
-	Endpoint      string    `json:"endpoint"`
-	Protocol      string    `json:"protocol"`
-	Identity      Identity  `json:"identity"`
-	Model         ModelInfo `json:"model"`
+	SchemaVersion int    `json:"schema_version"`
+	RequestID     string `json:"request_id"`
+	// SessionID 是客户端提供的会话标识（可能为空）。单条记录只存本轮，
+	// 完整上下文靠同一 SessionID（缺失时退化为同一用户 + 时间窗）的相邻记录重建。
+	SessionID  string    `json:"session_id,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	DurationMs int       `json:"duration_ms"`
+	StatusCode int       `json:"status_code"`
+	Stream     bool      `json:"stream"`
+	Endpoint   string    `json:"endpoint"`
+	Protocol   string    `json:"protocol"`
+	Identity   Identity  `json:"identity"`
+	Model      ModelInfo `json:"model"`
 
 	Conversation Conversation `json:"conversation"`
 	Usage        Usage        `json:"usage"`
@@ -212,6 +215,7 @@ type Record struct {
 type IndexRow struct {
 	ID         int64     `json:"id"`
 	RequestID  string    `json:"request_id"`
+	SessionID  string    `json:"session_id"`
 	CreatedAt  time.Time `json:"created_at"`
 	UserID     *int64    `json:"user_id,omitempty"`
 	APIKeyID   *int64    `json:"api_key_id,omitempty"`
@@ -243,6 +247,7 @@ type IndexRow struct {
 type SearchFilter struct {
 	AccountID int64
 	UserID    *int64
+	SessionID string
 	Start     time.Time
 	End       time.Time
 	Keyword   string

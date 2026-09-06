@@ -21,7 +21,7 @@ var (
 
 // 账号名在捕获时拿不到（gin 上下文里只落了 account_id），因此读取时 LEFT JOIN
 // accounts 补齐；快照列留作将来回填，非空时优先用快照，账号被删也仍有历史名字。
-const indexSelect = `c.id, c.request_id, c.created_at, c.user_id, c.api_key_id, c.account_id, c.group_id,
+const indexSelect = `c.id, c.request_id, c.session_id, c.created_at, c.user_id, c.api_key_id, c.account_id, c.group_id,
 	c.user_email, c.api_key_name,
 	COALESCE(NULLIF(c.account_name, ''), a.name, '') AS account_name,
 	c.group_name, c.platform, c.protocol, c.endpoint, c.model,
@@ -45,11 +45,11 @@ func (r *Repository) InsertBatch(ctx context.Context, rows []IndexRow) error {
 	}
 
 	// 列顺序必须与下面 args 的追加顺序严格一致。
-	const insertColumns = `request_id, created_at, user_id, api_key_id, account_id, group_id,
+	const insertColumns = `request_id, session_id, created_at, user_id, api_key_id, account_id, group_id,
 		user_email, api_key_name, account_name, group_name, platform, protocol, endpoint, model,
 		stream, status_code, duration_ms, ip_address, input_preview, input_bytes, output_bytes,
 		input_tokens, output_tokens, object_key`
-	const columnCount = 24
+	const columnCount = 25
 
 	placeholders := make([]string, 0, len(rows))
 	args := make([]any, 0, len(rows)*columnCount)
@@ -61,7 +61,7 @@ func (r *Repository) InsertBatch(ctx context.Context, rows []IndexRow) error {
 		}
 		placeholders = append(placeholders, "("+strings.Join(slots, ",")+")")
 		args = append(args,
-			row.RequestID, row.CreatedAt, row.UserID, row.APIKeyID, row.AccountID, row.GroupID,
+			row.RequestID, row.SessionID, row.CreatedAt, row.UserID, row.APIKeyID, row.AccountID, row.GroupID,
 			row.UserEmail, row.APIKeyName, row.AccountName, row.GroupName, row.Platform,
 			row.Protocol, row.Endpoint, row.Model, row.Stream, row.StatusCode, row.DurationMs,
 			row.IPAddress, row.InputPreview, row.InputBytes, row.OutputBytes, row.InputTokens,
@@ -89,6 +89,10 @@ func (r *Repository) Search(ctx context.Context, filter SearchFilter) ([]IndexRo
 	if filter.UserID != nil {
 		args = append(args, *filter.UserID)
 		where += fmt.Sprintf(" AND c.user_id = $%d", len(args))
+	}
+	if sessionID := strings.TrimSpace(filter.SessionID); sessionID != "" {
+		args = append(args, sessionID)
+		where += fmt.Sprintf(" AND c.session_id = $%d", len(args))
 	}
 	if keyword := strings.TrimSpace(filter.Keyword); keyword != "" {
 		args = append(args, "%"+escapeLike(keyword)+"%")
@@ -194,6 +198,7 @@ func (f *SearchFilter) Normalize() {
 		f.Limit = MaxSearchLimit
 	}
 	f.Keyword = strings.TrimSpace(f.Keyword)
+	f.SessionID = strings.TrimSpace(f.SessionID)
 }
 
 // Validate 强制"必须指定账号 + 时间范围"，拒绝退化成全表扫描的查询。
@@ -215,7 +220,7 @@ func scanIndexRows(rows *sql.Rows) ([]IndexRow, error) {
 	for rows.Next() {
 		var row IndexRow
 		if err := rows.Scan(
-			&row.ID, &row.RequestID, &row.CreatedAt, &row.UserID, &row.APIKeyID, &row.AccountID,
+			&row.ID, &row.RequestID, &row.SessionID, &row.CreatedAt, &row.UserID, &row.APIKeyID, &row.AccountID,
 			&row.GroupID, &row.UserEmail, &row.APIKeyName, &row.AccountName, &row.GroupName,
 			&row.Platform, &row.Protocol, &row.Endpoint, &row.Model, &row.Stream, &row.StatusCode,
 			&row.DurationMs, &row.IPAddress, &row.InputPreview, &row.InputBytes, &row.OutputBytes,

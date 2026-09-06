@@ -9,6 +9,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -56,6 +57,7 @@ func Middleware(svc *Service) gin.HandlerFunc {
 
 		svc.Capture(CaptureInput{
 			RequestID:         contextString(c, ctxkey.RequestID),
+			SessionID:         service.ExtractClientSessionID(c),
 			StartedAt:         startedAt,
 			Duration:          time.Since(startedAt),
 			StatusCode:        original.Status(),

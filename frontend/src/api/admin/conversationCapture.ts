@@ -53,6 +53,8 @@ export interface ConversationCaptureRuntime {
 export interface ConversationCaptureRecord {
   id: number
   request_id: string
+  /** 客户端提供的会话标识；很多客户端不提供，此时为空串 */
+  session_id: string
   created_at: string
   user_id?: number
   api_key_id?: number
@@ -93,6 +95,7 @@ export interface ConversationCaptureSearchResult {
     start: string
     end: string
     keyword?: string
+    session_id?: string
     limit: number
   }
 }
@@ -103,6 +106,8 @@ export interface ConversationCaptureSearchParams {
   start?: string
   end?: string
   keyword?: string
+  /** 按会话精确收敛，用于从一条记录跳到同一会话的其余轮次 */
+  session_id?: string
   user_id?: number
   limit?: number
 }

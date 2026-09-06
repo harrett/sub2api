@@ -105,3 +105,38 @@ func TestConversationSchemaHasNoSystemOrTools(t *testing.T) {
 	require.NotContains(t, string(encoded), `"tools"`)
 	require.Contains(t, string(encoded), `"input":"hi"`)
 }
+
+// 抽样 3（KFlash/Cline 系客户端）把 <environment_details> 追加在用户消息**内部**，
+// 里面还带每轮都变的时间戳。整条丢会丢掉"进行修复"，整条留会把时间戳噪音写进语料，
+// 所以必须只挖掉标签块。
+func TestLastUserTextStripsInlineEnvironmentDetails(t *testing.T) {
+	body := []byte(`{"messages":[{"role":"user","content":"进行修复\n<environment_details>\nCurrent time: 2026-09-06T09:48:55+08:00\nActive file: AndroidManifest.xml\nVisible files:\n  AndroidManifest.xml\n</environment_details>"}]}`)
+
+	require.Equal(t, "进行修复", LastUserText(ProtocolOpenAIChat, body))
+	require.Equal(t, "进行修复", ExtractPreview(ProtocolOpenAIChat, body, 1024))
+}
+
+// Claude Code 把 system-reminder 追加进同一条用户消息时同样只挖块，不丢人写的部分。
+func TestStripInjectedBlocksKeepsSurroundingHumanText(t *testing.T) {
+	require.Equal(t, "帮我改这个",
+		sanitizeUserText("帮我改这个\n<system-reminder>internal note</system-reminder>"))
+	require.Equal(t, "before after",
+		sanitizeUserText("before <environment_details>x</environment_details> after"))
+}
+
+// 上游截断会留下没有闭合标签的残缺块，不能让它泄进语料。
+func TestStripInjectedBlocksHandlesUnclosedTag(t *testing.T) {
+	require.Equal(t, "真实提问",
+		sanitizeUserText("真实提问\n<environment_details>\nCurrent time: 2026-09-06T09:48"))
+}
+
+// 整条都是注入块时结果为空，扫描继续往前找上一条真实用户输入。
+func TestUserMessageThatIsOnlyAnInjectedBlockYieldsNothing(t *testing.T) {
+	require.Empty(t, sanitizeUserText("<environment_details>only this</environment_details>"))
+
+	body := []byte(`{"messages":[
+		{"role":"user","content":"真实提问"},
+		{"role":"user","content":"<environment_details>noise</environment_details>"}
+	]}`)
+	require.Equal(t, "真实提问", LastUserText(ProtocolOpenAIChat, body))
+}
