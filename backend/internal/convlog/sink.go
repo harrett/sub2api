@@ -191,8 +191,12 @@ func (s *Sink) drain(ctx context.Context) {
 }
 
 // persist 把一条记录写进 spool 段，并回填索引行的 object_key。
-// 磁盘保护生效时 object_key 留空——索引照写，全文这次不落盘。
+// object_key 留空有两种情况：磁盘保护生效，或本条按"只写索引"处理。
+// 两种情况下索引行都照写，风控依然搜得到。
 func (s *Sink) persist(rec *queuedRecord) (IndexRow, bool) {
+	if len(rec.line) == 0 {
+		return rec.row, true
+	}
 	objectKey, err := s.spool.Append(rec.line)
 	switch {
 	case err == nil:

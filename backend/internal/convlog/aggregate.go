@@ -256,18 +256,24 @@ func aggregateImagesResponse(body []byte, result *AggregateResult) {
 	summary := map[string]any{}
 	var images []any
 	gjson.GetBytes(body, "data").ForEach(func(_, item gjson.Result) bool {
-		entry := map[string]any{}
+		// 只留模型改写后的提示词（那是文本输出，对蒸馏有用）。
+		// 图片本身不留，指向图片的 url 也不留——它是短时效链接，存下来既无用
+		// 又等于保留了模型输出的图片。
 		if revised := item.Get("revised_prompt").String(); revised != "" {
-			entry["revised_prompt"] = revised
+			images = append(images, map[string]any{"revised_prompt": revised})
+		} else {
+			images = append(images, map[string]any{})
 		}
-		if url := item.Get("url").String(); url != "" {
-			entry["url"] = url
-		}
-		images = append(images, entry)
 		return true
 	})
 	if len(images) > 0 {
-		summary["images"] = images
+		summary["image_count"] = len(images)
+		for _, entry := range images {
+			if _, ok := entry.(map[string]any)["revised_prompt"]; ok {
+				summary["images"] = images
+				break
+			}
+		}
 	}
 	if size := gjson.GetBytes(body, "size").String(); size != "" {
 		summary["size"] = size

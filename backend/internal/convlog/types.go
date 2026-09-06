@@ -285,9 +285,9 @@ type RuntimeStats struct {
 	UploadedTotal     uint64 `json:"uploaded_total"`
 	UploadFailedTotal uint64 `json:"upload_failed_total"`
 	IndexWriteFailed  uint64 `json:"index_write_failed_total"`
-	// SkippedNoOutput 是"失败且模型无输出"而未留存的请求数，用来解释为什么
-	// 捕获量远小于网关请求量。
-	SkippedNoOutput    uint64 `json:"skipped_no_output_total"`
+	// IndexOnlyTotal 是"失败、无模型输出、且从未碰到上游账号"因而只写了索引行、
+	// 正文未落盘的请求数。用来解释为什么对象存储的记录数远小于索引行数。
+	IndexOnlyTotal     uint64 `json:"index_only_total"`
 	LastError          string `json:"last_error,omitempty"`
 	ObjectStoreEnabled bool   `json:"object_store_enabled"`
 }

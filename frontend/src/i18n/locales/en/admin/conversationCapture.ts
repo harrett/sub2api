@@ -39,7 +39,7 @@ export default {
       viewed: 'Viewed',
       continuation: 'Continuation',
       continuationHint: 'An agent loop turn with no new user input; the input repeats the previous record',
-      noFullText: 'Disk protection was active when this row was written; the full record was not persisted',
+      noFullText: 'This request produced no model output (it never reached upstream, or disk protection was active); only the index row was written, the preview is available',
       banUser: 'Ban user',
       banConfirm: 'Ban user {email}? Their API keys stop working immediately.',
       banned: 'User banned',

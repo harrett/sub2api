@@ -10,7 +10,7 @@ import (
 // 生产一小时实测：608 条 503/429/404 全都没有任何模型输出，其中 596 条根本没绑定到
 // 上游账号——既不可蒸馏，也不构成账号封禁风险，却占了 79% 的字节，还被客户端重试
 // 反复放大。这类请求不再留存。
-func TestCaptureSkipsFailedRequestsWithoutModelOutput(t *testing.T) {
+func TestCaptureWritesIndexOnlyForUnreachedFailures(t *testing.T) {
 	svc := newTestService(t, true)
 	svc.Capture(CaptureInput{
 		StatusCode:   503,
@@ -19,8 +19,11 @@ func TestCaptureSkipsFailedRequestsWithoutModelOutput(t *testing.T) {
 		ResponseBody: []byte(`{"error":{"message":"no available accounts"}}`),
 	})
 
-	require.Empty(t, svc.sink.queue, "an output-less failure must not be stored")
-	require.EqualValues(t, 1, svc.Runtime().SkippedNoOutput)
+	require.Len(t, svc.sink.queue, 1, "the index row must still be written so the user stays traceable")
+	rec := <-svc.sink.queue
+	require.Empty(t, rec.line, "no body goes to object storage")
+	require.Equal(t, "hi", rec.row.InputPreview, "the preview keeps risk review searchable")
+	require.EqualValues(t, 1, svc.Runtime().IndexOnlyTotal)
 }
 
 // 失败但上游确实回了内容时仍要留存：那次调用真的用掉了账号。
@@ -35,7 +38,7 @@ func TestCaptureKeepsFailedRequestThatCarriesModelOutput(t *testing.T) {
 	})
 
 	require.Len(t, svc.sink.queue, 1)
-	require.Zero(t, svc.Runtime().SkippedNoOutput)
+	require.Zero(t, svc.Runtime().IndexOnlyTotal)
 }
 
 // 生图端点没有对话数组，用户输入就是 prompt。漏掉它等于让风控对生图完全失明。
@@ -84,4 +87,89 @@ func TestContinuationFlagIsAlwaysEmitted(t *testing.T) {
 	encoded, err := json.Marshal(Record{SchemaVersion: RecordSchemaVersion})
 	require.NoError(t, err)
 	require.Contains(t, string(encoded), `"continuation":false`)
+}
+
+// 追溯优先：已经绑定到上游账号之后才失败的请求必须留存。那次调用真的碰到了
+// 账号池，正是"防止账号被上游封"要追的对象。一小时实测里这类有 9 条。
+func TestCaptureKeepsFailedRequestThatReachedAnUpstreamAccount(t *testing.T) {
+	svc := newTestService(t, true)
+	svc.Capture(CaptureInput{
+		StatusCode:   503,
+		Endpoint:     "/v1/messages",
+		RequestBody:  []byte(`{"messages":[{"role":"user","content":"trace me"}]}`),
+		ResponseBody: []byte(`{"error":{"message":"upstream overloaded"}}`),
+		Identity:     Identity{UserID: 7, AccountID: 42},
+	})
+
+	require.Len(t, svc.sink.queue, 1, "a request that consumed an account must stay traceable")
+	require.NotEmpty(t, (<-svc.sink.queue).line, "and its body must reach object storage")
+	require.Zero(t, svc.Runtime().IndexOnlyTotal)
+}
+
+// 反面：从未绑定账号的失败才丢弃。
+func TestCaptureIndexOnlyFailureStaysSearchable(t *testing.T) {
+	svc := newTestService(t, true)
+	svc.Capture(CaptureInput{
+		StatusCode:   503,
+		Endpoint:     "/v1/messages",
+		RequestBody:  []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
+		ResponseBody: []byte(`{"error":{"message":"no available accounts"}}`),
+		Identity:     Identity{UserID: 7},
+	})
+
+	require.Len(t, svc.sink.queue, 1)
+	rec := <-svc.sink.queue
+	require.Empty(t, rec.line)
+	require.Equal(t, "hi", rec.row.InputPreview)
+	require.EqualValues(t, 1, svc.Runtime().IndexOnlyTotal)
+}
+
+// 生图编辑走 multipart：只取提示词，参考图连读都不读。
+func TestMultipartImageEditKeepsPromptAndDropsReferenceImages(t *testing.T) {
+	const boundary = "BOUNDARY"
+	body := "--" + boundary + "\r\n" +
+		"Content-Disposition: form-data; name=\"prompt\"\r\n\r\n" +
+		"把这张图里的人换成别人\r\n" +
+		"--" + boundary + "\r\n" +
+		"Content-Disposition: form-data; name=\"image\"; filename=\"ref.png\"\r\n" +
+		"Content-Type: image/png\r\n\r\n" +
+		"\x89PNG\x0d\x0aBINARYPIXELS\r\n" +
+		"--" + boundary + "--\r\n"
+
+	got := userInputFor(ProtocolOpenAIImages, CaptureInput{
+		RequestBody: []byte(body),
+		ContentType: "multipart/form-data; boundary=" + boundary,
+	})
+	require.Equal(t, "把这张图里的人换成别人", got)
+	require.NotContains(t, got, "BINARYPIXELS")
+}
+
+// 内联图片可能出现在任何字段名下，只能按值识别 data URI。
+func TestRedactJSONReplacesInlineImagePayloads(t *testing.T) {
+	var payload any
+	require.NoError(t, json.Unmarshal([]byte(`{"messages":[{"content":[
+		{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAAPIXELS"}},
+		{"type":"text","text":"describe it"}
+	]}],"contents":[{"parts":[{"inline_data":{"mime_type":"image/png","data":"BBBBPIXELS"}}]}]}`), &payload))
+
+	encoded, err := json.Marshal(redactJSON(payload))
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "AAAAPIXELS")
+	require.NotContains(t, string(encoded), "BBBBPIXELS")
+	require.Contains(t, string(encoded), imagePlaceholder)
+	require.Contains(t, string(encoded), "describe it")
+}
+
+// 生图响应不留图片，也不留指向图片的短时效 url。
+func TestImageResponseKeepsNoPictureAndNoURL(t *testing.T) {
+	body := []byte(`{"size":"1024x1024","data":[
+		{"b64_json":"PIXELS","url":"https://short.lived/a.png","revised_prompt":"a red bicycle"}
+	]}`)
+
+	result := AggregateResponse(ProtocolOpenAIImages, body, false)
+	encoded, err := json.Marshal(result.Output)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "PIXELS")
+	require.NotContains(t, string(encoded), "short.lived")
+	require.Contains(t, string(encoded), "a red bicycle")
 }

@@ -36,6 +36,7 @@ type CaptureInput struct {
 	Duration          time.Duration
 	StatusCode        int
 	Endpoint          string
+	ContentType       string
 	Stream            bool
 	RequestBody       []byte
 	ResponseBody      []byte
@@ -60,7 +61,7 @@ type Service struct {
 	currentS3        *S3Config
 	storeFingerprint string
 
-	skippedNoOutput atomic.Uint64
+	indexOnlyTotal atomic.Uint64
 
 	lifecycle sync.Mutex
 	cancel    context.CancelFunc
@@ -296,12 +297,18 @@ func (s *Service) Capture(input CaptureInput) {
 	protocol := DetectProtocol(input.Endpoint, input.RequestBody)
 	aggregate := AggregateResponse(protocol, input.ResponseBody, input.ResponseTruncated)
 
-	// 失败且模型什么都没输出的请求不留存。生产一小时的实测里这类占了 79% 的字节：
-	// 608 条 503/429/404，其中 596 条根本没绑定到上游账号——既没有可蒸馏的输出，
-	// 也不构成账号封禁风险，而客户端重试又会把同一份输入反复写进来。
-	if input.StatusCode >= 400 && aggregate.Output.IsEmpty() {
-		s.skippedNoOutput.Add(1)
-		return
+	// "从未碰到上游账号、且模型什么都没输出"的失败请求只写索引，不写正文。
+	//
+	// 生产一小时实测：608 条 503/429/404 无一条带模型输出，却占了 79% 的字节，
+	// 客户端重试还会把同一份输入反复写进来。但整条丢弃会捅出追溯窟窿——那一小时
+	// 13 个用户里有 8 个**只出现在这类失败里**，全丢就等于这些人在风控里彻底隐身。
+	//
+	// 所以只丢正文：PostgreSQL 索引行照写（用户、账号、时间、模型、1KB 输入预览
+	// 全都在，可搜可查），对象存储不落这一份。索引成本约为正文的 7%。
+	// 已经绑定账号之后才失败的请求不在此列——那次调用真的碰到了账号池，正文要留。
+	indexOnly := input.StatusCode >= 400 && aggregate.Output.IsEmpty() && input.Identity.AccountID <= 0
+	if indexOnly {
+		s.indexOnlyTotal.Add(1)
 	}
 	// 响应侧同样要清洗：上游把 reasoning 的密文也回写在 output 里。
 	aggregate.Output.Content = redactJSON(aggregate.Output.Content)
@@ -314,7 +321,7 @@ func (s *Service) Capture(input CaptureInput) {
 		rawRequest = redactJSON(decodeJSONBytes(input.RequestBody))
 		conversation.Roles = RequestRoles(protocol, rawRequest)
 	} else {
-		conversation.Input = LastUserText(protocol, input.RequestBody)
+		conversation.Input = userInputFor(protocol, input)
 	}
 
 	record := Record{
@@ -340,10 +347,14 @@ func (s *Service) Capture(input CaptureInput) {
 		RawRequest:   rawRequest,
 	}
 
-	line, err := json.Marshal(&record)
-	if err != nil {
-		logger.L().Warn("convlog.marshal_failed", zap.Error(err))
-		return
+	var line []byte
+	if !indexOnly {
+		marshaled, err := json.Marshal(&record)
+		if err != nil {
+			logger.L().Warn("convlog.marshal_failed", zap.Error(err))
+			return
+		}
+		line = marshaled
 	}
 
 	row := IndexRow{
@@ -410,7 +421,9 @@ func (s *Service) FetchFullRecord(ctx context.Context, requestID string) (json.R
 		return nil, err
 	}
 	if strings.TrimSpace(row.ObjectKey) == "" {
-		return nil, fmt.Errorf("%w: record was indexed while disk protection was active, full text was not persisted", ErrRecordNotFound)
+		// object_key 为空有两种来源：磁盘保护生效，或本条请求没碰到上游账号也没有
+		// 模型输出（只写索引）。两种情况下索引行都在，能搜到、能看预览。
+		return nil, fmt.Errorf("%w: only the index row was written for this request; the preview is available but there is no full record", ErrRecordNotFound)
 	}
 
 	// spool/uploader 在初始化失败的降级模式下为 nil；查全文不该因此 panic。
@@ -466,7 +479,7 @@ func (s *Service) Runtime() RuntimeStats {
 		UploadedTotal:      uploaded,
 		UploadFailedTotal:  uploadFailed,
 		IndexWriteFailed:   indexFailed,
-		SkippedNoOutput:    s.skippedNoOutput.Load(),
+		IndexOnlyTotal:     s.indexOnlyTotal.Load(),
 		ObjectStoreEnabled: s.uploader.currentStore() != nil,
 		LastError:          firstNonEmpty(uploadErr, spoolErr),
 	}

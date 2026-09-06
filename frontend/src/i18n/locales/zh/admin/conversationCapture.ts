@@ -39,7 +39,7 @@ export default {
       viewed: '已查看',
       continuation: '续跑',
       continuationHint: '本轮是 agent 循环续跑，用户没有新提问，输入与上一条相同',
-      noFullText: '该记录写入时磁盘保护生效，全文未落盘',
+      noFullText: '该请求没有模型输出（未到达上游或磁盘保护生效），只写了索引，可看预览',
       banUser: '封禁用户',
       banConfirm: '确认封禁用户 {email}？该用户的 API Key 将立即停止服务。',
       banned: '用户已封禁',

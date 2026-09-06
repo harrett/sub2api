@@ -21,12 +21,12 @@ import (
 // 关闭时第一条语句即返回，不包 writer、不读 body，热路径零额外分配。
 func Middleware(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if svc == nil || !svc.Enabled() || !capturableRequest(c.Request) || !svc.SampleAllows() {
+		maxRequestBytes, maxResponseBytes := svc.Limits()
+		if svc == nil || !svc.Enabled() || !capturableRequest(c.Request, maxRequestBytes) || !svc.SampleAllows() {
 			c.Next()
 			return
 		}
 
-		maxRequestBytes, maxResponseBytes := svc.Limits()
 		requestBody, readErr := drainRequestBody(c.Request)
 		// 无论读成功与否都要把 body 还回去：读失败时连同原始错误一起回放，
 		// handler 看到的行为与没有本中间件时完全一致。
@@ -62,6 +62,7 @@ func Middleware(svc *Service) gin.HandlerFunc {
 			Duration:          time.Since(startedAt),
 			StatusCode:        original.Status(),
 			Endpoint:          requestPath(c),
+			ContentType:       c.GetHeader("Content-Type"),
 			Stream:            isStreamingResponse(original),
 			RequestBody:       requestBody,
 			ResponseBody:      responseBody,
@@ -74,9 +75,16 @@ func Middleware(svc *Service) gin.HandlerFunc {
 	}
 }
 
-// capturableRequest 过滤掉不适合留存的请求：非 JSON（multipart 音视频上传等）
-// 与带 Content-Encoding 的压缩体（解压逻辑属于 httputil，重复实现只会引入分歧）。
-func capturableRequest(req *http.Request) bool {
+// capturableRequest 决定这次请求要不要读进内存。
+//
+// 带 Content-Encoding 的压缩体一律跳过：解压逻辑属于 httputil，在这里重复实现
+// 只会引入分歧。
+//
+// multipart 有条件放行：/v1/images/edits 走 multipart，整段跳过会让生图编辑
+// 完全不可追溯——而那正是上传参考图做违规改图的入口。只在 Content-Length 已知
+// 且不超过上限时缓冲，避免把大文件上传读进内存；表单里也只取提示词字段，
+// 文件分块连读都不读。
+func capturableRequest(req *http.Request, maxRequestBytes int) bool {
 	if req == nil || req.Body == nil || req.Method == http.MethodGet {
 		return false
 	}
@@ -85,7 +93,15 @@ func capturableRequest(req *http.Request) bool {
 		return false
 	}
 	contentType := strings.ToLower(strings.TrimSpace(req.Header.Get("Content-Type")))
-	return contentType == "" || strings.Contains(contentType, "json")
+	switch {
+	case contentType == "", strings.Contains(contentType, "json"):
+		return true
+	case isMultipartContentType(contentType):
+		// 长度未知（chunked）时无法预先设限，宁可不捕获。
+		return req.ContentLength > 0 && req.ContentLength <= int64(maxRequestBytes)
+	default:
+		return false
+	}
 }
 
 // drainRequestBody 读完请求体并返回读到的字节与错误。错误发生时已读部分仍要返回，

@@ -41,10 +41,19 @@ var sensitiveJSONKeys = map[string]struct{}{
 // 里就有 64KB，占该记录的 5.4%，而人和模型都永远读不了它。
 var droppedJSONKeys = map[string]struct{}{
 	"encrypted_content": {},
-	// 生图响应把整张图以 base64 塞在 b64_json 里，单条能到 MB 级；
-	// 对风控和蒸馏都没有价值，绝不能进对象存储。
-	"b64_json": {},
+	// 图片载荷：用户上传的参考图与模型生成的图都不留存，只留提示词文本。
+	// 单张图 base64 就能到 MB 级，而风控要看的是"让模型做什么"，不是图本身。
+	"b64_json":    {}, // OpenAI 生图响应
+	"inline_data": {}, // Gemini 请求/响应内联图
+	"inlineData":  {}, // Gemini 驼峰写法
 }
+
+// imageDataURIPrefix 标识内联图片的 data URI。这类值可能出现在任何字段名下
+// （image_url.url、source.data、自定义字段），只能按值识别。
+const imageDataURIPrefix = "data:image/"
+
+// imagePlaceholder 替换掉图片载荷，保留"这里原本有张图"这个事实。
+const imagePlaceholder = "[IMAGE]"
 
 // redactJSON 递归清洗 JSON 值：凭证字段替换成占位符，不透明字段整段删除。
 // 传入的是 encoding/json 解码结果（map[string]any / []any / 标量），
@@ -79,6 +88,11 @@ func redactJSONDepth(value any, depth int) any {
 	case []any:
 		for i, child := range typed {
 			typed[i] = redactJSONDepth(child, depth+1)
+		}
+		return typed
+	case string:
+		if strings.HasPrefix(typed, imageDataURIPrefix) {
+			return imagePlaceholder
 		}
 		return typed
 	default:

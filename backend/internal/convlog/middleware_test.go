@@ -90,21 +90,39 @@ func TestMiddlewareIsTransparentWhenDisabled(t *testing.T) {
 	require.Zero(t, depth)
 }
 
-func TestMiddlewareSkipsNonJSONAndCompressedBodies(t *testing.T) {
+func TestCapturableRequestContentTypeRules(t *testing.T) {
 	svc := newTestService(t, true)
 
-	multipart := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader("binary"))
-	multipart.Header.Set("Content-Type", "multipart/form-data; boundary=x")
-	require.False(t, capturableRequest(multipart))
+	// 未知长度的 multipart 无法预先设限，跳过。
+	chunked := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader("binary"))
+	chunked.Header.Set("Content-Type", "multipart/form-data; boundary=x")
+	chunked.ContentLength = -1
+	require.False(t, capturableRequest(chunked, DefaultMaxRequestBytes))
+
+	// 超过上限的上传同样不读进内存。
+	huge := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader("binary"))
+	huge.Header.Set("Content-Type", "multipart/form-data; boundary=x")
+	huge.ContentLength = int64(DefaultMaxRequestBytes) + 1
+	require.False(t, capturableRequest(huge, DefaultMaxRequestBytes))
+
+	// 有界的 multipart 要放行：/v1/images/edits 否则完全不可追溯。
+	bounded := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader("binary"))
+	bounded.Header.Set("Content-Type", "multipart/form-data; boundary=x")
+	bounded.ContentLength = 4096
+	require.True(t, capturableRequest(bounded, DefaultMaxRequestBytes))
+
+	other := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader("binary"))
+	other.Header.Set("Content-Type", "application/octet-stream")
+	require.False(t, capturableRequest(other, DefaultMaxRequestBytes))
 
 	compressed := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader("{}"))
 	compressed.Header.Set("Content-Type", "application/json")
 	compressed.Header.Set("Content-Encoding", "gzip")
-	require.False(t, capturableRequest(compressed))
+	require.False(t, capturableRequest(compressed, DefaultMaxRequestBytes))
 
-	runCaptureRequest(t, svc, multipart, func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+	runCaptureRequest(t, svc, other, func(c *gin.Context) { c.String(http.StatusOK, "ok") })
 	depth, _, _, _, _, _ := svc.sink.Stats()
-	require.Zero(t, depth, "non-JSON requests must not enter the queue")
+	require.Zero(t, depth, "unsupported content types must not enter the queue")
 }
 
 // 捕获一条完整请求：队列里应出现一条可解析、且带归一化输出的记录。
