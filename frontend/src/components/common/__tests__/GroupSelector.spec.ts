@@ -1,9 +1,12 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import GroupSelector from '../GroupSelector.vue'
 import type { AdminGroup, Group, GroupPlatform } from '@/types'
 
+const authState = { isSimpleMode: false }
+
+vi.mock('@/stores', () => ({ useAuthStore: () => authState }))
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {
@@ -13,6 +16,11 @@ vi.mock('vue-i18n', async () => {
         params ? `${key}:${JSON.stringify(params)}` : key,
     }),
   }
+})
+
+// simple 模式是全局开关，测试间必须复位，否则后跑的用例会继承前一个的模式。
+beforeEach(() => {
+  authState.isSimpleMode = false
 })
 
 const makeGroup = (id: number, platform: GroupPlatform, name = `g${id}`): AdminGroup =>
@@ -95,5 +103,35 @@ describe('GroupSelector hidden selections', () => {
 
     await wrapper.find('input[type="text"]').setValue('group-6')
     expect(wrapper.findAll('[data-hidden-group-id]')).toHaveLength(0)
+  })
+})
+
+describe('GroupSelector simple-mode binding policy', () => {
+  const simpleModeGroups = [
+    { id: 1, name: 'Basic', platform: 'anthropic', status: 'active' },
+    { id: 2, name: 'Composite', platform: 'composite', status: 'active' }
+  ] as any
+
+  const mountSimpleModeSelector = (modelValue: number[] = []) => mount(GroupSelector, {
+    props: { modelValue, groups: simpleModeGroups },
+    global: { stubs: { GroupBadge: { props: ['name'], template: '<span>{{ name }}</span>' }, Icon: true } }
+  })
+
+  it('hides composite groups in simple mode and preserves basic groups', () => {
+    authState.isSimpleMode = true
+    const wrapper = mountSimpleModeSelector()
+    expect(wrapper.text()).toContain('Basic')
+    expect(wrapper.text()).not.toContain('Composite')
+  })
+
+  it('keeps composite groups available in advanced mode', () => {
+    const wrapper = mountSimpleModeSelector()
+    expect(wrapper.text()).toContain('Composite')
+  })
+
+  it('cleans hidden historical composite IDs while preserving visible selections', () => {
+    authState.isSimpleMode = true
+    const wrapper = mountSimpleModeSelector([1, 2])
+    expect(wrapper.emitted('update:modelValue')).toEqual([[[1]]])
   })
 })

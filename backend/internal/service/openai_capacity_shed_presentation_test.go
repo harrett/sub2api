@@ -22,7 +22,10 @@ func TestSanitizeOpenAIResponseFailedEventLabelsCapacityShedMessage(t *testing.T
 	// 之外的降载文案默认没有 code 字段，这里只验证不会被我们的改动破坏）。
 	message := gjson.GetBytes(out, "response.error.message").String()
 	require.Contains(t, message, "服务器侧问题")
-	require.Contains(t, message, "与你的账户余额和套餐额度无关")
+	// 责任方标签之外，指引正文也必须落到 message 上。这里的字样取自
+	// gatewayerr 指引表的 UPSTREAM_CAPACITY_SHED_MIDSTREAM 条目 —— 改那条
+	// hint 的措辞时必须同步改这里，否则本断言会失效。
+	require.Contains(t, message, "上游服务商暂时不可用")
 	require.Contains(t, message, "Our servers are currently overloaded", "原始上游说明不能丢失，只是追加标签")
 }
 
