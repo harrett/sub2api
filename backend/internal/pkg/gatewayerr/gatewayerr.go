@@ -342,7 +342,7 @@ var platformErrorGuidance = map[string]errorGuidance{
 	// internal/service 里对应的包装层。
 	"UPSTREAM_CAPACITY_SHED_MIDSTREAM": {
 		label: "服务器侧问题",
-		hint:  "上游服务当前容量紧张，暂时拒绝了这次生成请求。这与你的账户余额和套餐额度无关，请稍后重试。",
+		hint:  "上游服务商暂时不可用（或OpenAI/Anthropic官方过载），这通常是暂时的，请稍后重试或现在切换其它模型尝试；持续出现请联系管理员。",
 	},
 }
 
