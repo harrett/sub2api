@@ -324,9 +324,21 @@ func upstreamModelSyncStatusCode(err error) int {
 	return 0
 }
 
+// upstreamModelListEndpointUnsupported 判断错误是否表示"上游没有暴露模型列表端点"，
+// 此时同步应回退到账号已配置的模型继续做能力补全，而不是整体失败。
+//
+// 404 / 405 是第三方 OpenAI 兼容上游对未知端点的典型响应。403 覆盖另一类形态：上游
+// 只开放特定路径（如只挂 /api-proxy/images/*），其余路径在其网关/nginx 层被直接拒绝，
+// 等价于"没有模型列表端点"。
+//
+// 401 刻意不在此列——它是凭据失效的主信号，回退会把坏 key 静默伪装成同步成功
+// （见 TestSyncUpstreamModelCatalogDoesNotUseConfiguredModelsForRealUpstreamFailures）。
 func upstreamModelListEndpointUnsupported(err error) bool {
-	statusCode := upstreamModelSyncStatusCode(err)
-	return statusCode == http.StatusNotFound || statusCode == http.StatusMethodNotAllowed
+	switch upstreamModelSyncStatusCode(err) {
+	case http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusForbidden:
+		return true
+	}
+	return false
 }
 
 func configuredUpstreamModelsForCapabilitySync(account *Account) []string {
@@ -854,7 +866,7 @@ func (s *AccountTestService) buildGrokUpstreamModelsRequest(ctx context.Context,
 		)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildOpenAIModelsURL(normalizedBaseURL), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildOpenAIModelsURL(normalizedBaseURL, account.UpstreamBaseURLSkipVersion()), nil)
 	if err != nil {
 		return nil, newUpstreamModelSyncConfigError("Invalid Grok model list URL", err)
 	}
@@ -1020,7 +1032,7 @@ func buildOpenAIAPIKeyModelsRequest(ctx context.Context, account *Account, valid
 		return nil, newUpstreamModelSyncConfigError("Invalid OpenAI base URL", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildOpenAIModelsURL(normalizedBaseURL), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildOpenAIModelsURL(normalizedBaseURL, account.UpstreamBaseURLSkipVersion()), nil)
 	if err != nil {
 		return nil, newUpstreamModelSyncConfigError("Invalid OpenAI model list URL", err)
 	}
@@ -1204,8 +1216,8 @@ func buildV1ModelsURL(base string) string {
 	return normalized + "/v1/models"
 }
 
-func buildOpenAIModelsURL(base string) string {
-	return buildOpenAIEndpointURL(base, "/v1/models")
+func buildOpenAIModelsURL(base string, skipVersion bool) string {
+	return buildOpenAIEndpointURL(base, "/v1/models", skipVersion)
 }
 
 func buildGeminiModelsURL(base string) string {

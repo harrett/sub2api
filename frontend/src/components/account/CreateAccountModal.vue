@@ -1302,6 +1302,20 @@
             :placeholder="apiKeyBaseUrlPlaceholder"
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
+          <label v-if="showBaseUrlSkipVersion" class="mt-2 flex items-start">
+            <input
+              v-model="baseUrlSkipVersion"
+              type="checkbox"
+              data-testid="base-url-skip-version"
+              class="mr-2 mt-0.5 text-primary-600 focus:ring-primary-500"
+            />
+            <span class="text-sm text-gray-700 dark:text-gray-300">
+              {{ t('admin.accounts.baseUrlSkipVersion') }}
+              <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.accounts.baseUrlSkipVersionHint') }}
+              </span>
+            </span>
+          </label>
           <GrokBaseUrlPresets
             v-if="form.platform === 'grok'"
             class="mt-2"
@@ -4071,6 +4085,9 @@ const submitting = ref(false)
 const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_account'>('oauth-based') // UI selection for account category
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
+// 上游把 OpenAI 兼容接口挂在非版本号前缀下且路径不含 /v1（如 https://host/api-proxy/images/generations）
+// 时勾选：网关拼接端点时不再补 /v1。默认关闭，存量渠道拼接行为不变。
+const baseUrlSkipVersion = ref(false)
 const apiKeyValue = ref('')
 const upstreamBillingAutoProbeEnabled = ref(true)
 
@@ -4088,6 +4105,13 @@ const adaptiveBaseUrls = ref<Record<CnNativeApiProtocol, string>>({
   responses: ''
 })
 const isCNPlatform = computed(() => isCNProviderPlatform(form.platform))
+
+// base_url_skip_version 只影响 OpenAI 协议族的端点拼接（openai / grok / 国产兼容供应商）。
+const showBaseUrlSkipVersion = computed(
+  () =>
+    form.type === 'apikey' &&
+    (form.platform === 'openai' || form.platform === 'grok' || isCNProviderPlatform(form.platform))
+)
 // CnBaseUrlPresets 的 platform prop 是平台字面量联合类型，模板里不能写
 // `as` 断言（其中的 `|` 会被 eslint 误判为 Vue2 filter 语法），经此 computed 传递。
 const cnPresetPlatform = computed<CnProviderPlatform>(() => {
@@ -5182,6 +5206,7 @@ const resetForm = () => {
   apiProtocol.value = 'adaptive'
   adaptiveBaseUrls.value = { chat_completions: '', anthropic: '', responses: '' }
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
+  baseUrlSkipVersion.value = false
   apiKeyValue.value = ''
   upstreamRequestIdHeader.value = ''
   upstreamBillingAutoProbeEnabled.value = true
@@ -5646,6 +5671,9 @@ const handleSubmit = async () => {
   const credentials: Record<string, unknown> = {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
+  }
+  if (showBaseUrlSkipVersion.value && baseUrlSkipVersion.value) {
+    credentials.base_url_skip_version = true
   }
   if (form.platform === 'gemini') {
     credentials.tier_id = geminiTierAIStudio.value

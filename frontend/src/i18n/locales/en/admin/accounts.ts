@@ -557,6 +557,9 @@ export default {
       setupTokenLongLived: 'Setup Token (Long-lived)',
       baseUrl: 'Base URL',
       baseUrlHint: 'Leave default for official Anthropic API',
+      baseUrlSkipVersion: 'Base URL already includes the full path prefix (do not append /v1)',
+      baseUrlSkipVersionHint:
+        'Tick this when the upstream exposes its OpenAI-compatible API under a non-version prefix without /v1 in the path, e.g. https://host/api-proxy/images/generations. Leave it off for ordinary relays that serve {base}/v1/...',
       apiKeyRequired: 'API Key *',
       apiKeyPlaceholder: 'sk-ant-api03-...',
       apiKeyHint: 'Your Claude Console API Key',

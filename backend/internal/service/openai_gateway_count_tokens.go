@@ -440,7 +440,7 @@ func (s *OpenAIGatewayService) buildInputTokensUpstreamRequest(
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesInputTokensURL(validatedURL)
+			targetURL = buildOpenAIResponsesInputTokensURL(validatedURL, account.UpstreamBaseURLSkipVersion())
 		}
 	}
 

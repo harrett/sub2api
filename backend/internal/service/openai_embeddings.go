@@ -61,7 +61,7 @@ func (s *OpenAIGatewayService) ForwardEmbeddings(
 	if err != nil {
 		return nil, fmt.Errorf("invalid base_url: %w", err)
 	}
-	targetURL := buildOpenAIEmbeddingsURL(validatedURL)
+	targetURL := buildOpenAIEmbeddingsURL(validatedURL, account.UpstreamBaseURLSkipVersion())
 
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	upstreamReq, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, targetURL, bytes.NewReader(upstreamBody))
@@ -247,6 +247,6 @@ func firstPositiveGJSONInt(values ...gjson.Result) int {
 	return 0
 }
 
-func buildOpenAIEmbeddingsURL(base string) string {
-	return buildOpenAIEndpointURL(base, "/v1/embeddings")
+func buildOpenAIEmbeddingsURL(base string, skipVersion bool) string {
+	return buildOpenAIEndpointURL(base, "/v1/embeddings", skipVersion)
 }

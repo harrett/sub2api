@@ -644,6 +644,9 @@ export default {
       setupTokenLongLived: 'Setup Token（长期有效）',
       baseUrl: 'Base URL',
       baseUrlHint: '留空使用官方 Anthropic API',
+      baseUrlSkipVersion: 'Base URL 已包含完整路径前缀（不要补 /v1）',
+      baseUrlSkipVersionHint:
+        '上游把 OpenAI 兼容接口挂在非版本号前缀下、且路径中不含 /v1 时勾选，例如 https://host/api-proxy/images/generations。普通中转站（{base}/v1/...）请勿勾选。',
       apiKeyRequired: 'API Key *',
       apiKeyPlaceholder: 'sk-ant-api03-...',
       apiKeyHint: '您的 Claude Console API Key',

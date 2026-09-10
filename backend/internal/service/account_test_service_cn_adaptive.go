@@ -158,7 +158,7 @@ func (s *AccountTestService) testCNProviderAdaptiveResponsesConnection(c *gin.Co
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid adaptive Responses base URL: %s", err.Error()))
 	}
-	apiURL := buildOpenAIResponsesURLForPlatform(account.Platform, baseURL)
+	apiURL := buildOpenAIResponsesURLForPlatform(account.Platform, baseURL, account.UpstreamBaseURLSkipVersion())
 
 	payload := createOpenAITestPayload(testModelID, false)
 	// DeepSeek / Kimi native Responses endpoints are stateless and do not need

@@ -417,6 +417,46 @@ func (a *Account) GetCredentialAsInt64(key string) int64 {
 	return 0
 }
 
+// GetCredentialAsBool 解析凭证中的布尔字段。
+// 兼容 JSON 原生 bool 与前端可能提交的 "true"/"1" 字符串；缺失或无法解析时返回 false。
+func (a *Account) GetCredentialAsBool(key string) bool {
+	if a == nil || a.Credentials == nil {
+		return false
+	}
+	val, ok := a.Credentials[key]
+	if !ok || val == nil {
+		return false
+	}
+	switch v := val.(type) {
+	case bool:
+		return v
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(v))
+		return err == nil && parsed
+	case json.Number:
+		i, err := v.Int64()
+		return err == nil && i != 0
+	case float64:
+		return v != 0
+	case int:
+		return v != 0
+	case int64:
+		return v != 0
+	}
+	return false
+}
+
+// UpstreamBaseURLSkipVersion 报告账号是否声明"上游 base URL 已包含完整前缀，
+// 拼接端点时不要补 /v1"。
+//
+// 存于 credentials.base_url_skip_version。用于把 OpenAI 兼容接口挂在非版本号
+// 前缀下且路径不含 /v1 的上游（如 https://host/api-proxy/images/generations）接进来——
+// 这类形状无法从 base URL 自身推导，见 buildOpenAIEndpointURL。
+// 默认 false，存量账号拼接行为逐字节不变。
+func (a *Account) UpstreamBaseURLSkipVersion() bool {
+	return a.GetCredentialAsBool("base_url_skip_version")
+}
+
 func (a *Account) IsTempUnschedulableEnabled() bool {
 	if a.Credentials == nil {
 		return false

@@ -122,7 +122,7 @@ func TestBuildOpenAIModelsURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			require.Equal(t, tt.want, buildOpenAIModelsURL(tt.base))
+			require.Equal(t, tt.want, buildOpenAIModelsURL(tt.base, false))
 		})
 	}
 }

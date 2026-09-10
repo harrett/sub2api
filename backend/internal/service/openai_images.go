@@ -778,7 +778,7 @@ func (s *OpenAIGatewayService) buildOpenAIImagesRequest(
 		if err != nil {
 			return nil, err
 		}
-		targetURL = buildOpenAIImagesURL(validatedURL, endpoint)
+		targetURL = buildOpenAIImagesURL(validatedURL, endpoint, account.UpstreamBaseURLSkipVersion())
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(body))
@@ -815,8 +815,8 @@ func (s *OpenAIGatewayService) buildOpenAIImagesRequest(
 	return req, nil
 }
 
-func buildOpenAIImagesURL(base string, endpoint string) string {
-	return buildOpenAIEndpointURL(base, endpoint)
+func buildOpenAIImagesURL(base string, endpoint string, skipVersion bool) string {
+	return buildOpenAIEndpointURL(base, endpoint, skipVersion)
 }
 
 func rewriteOpenAIImagesModel(body []byte, contentType string, model string) ([]byte, string, error) {

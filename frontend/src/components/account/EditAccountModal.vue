@@ -47,6 +47,20 @@
             "
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
+          <label v-if="showBaseUrlSkipVersion" class="mt-2 flex items-start">
+            <input
+              v-model="editBaseUrlSkipVersion"
+              type="checkbox"
+              data-testid="base-url-skip-version"
+              class="mr-2 mt-0.5 text-primary-600 focus:ring-primary-500"
+            />
+            <span class="text-sm text-gray-700 dark:text-gray-300">
+              {{ t('admin.accounts.baseUrlSkipVersion') }}
+              <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.accounts.baseUrlSkipVersionHint') }}
+              </span>
+            </span>
+          </label>
           <GrokBaseUrlPresets
             v-if="account.platform === 'grok'"
             class="mt-2"
@@ -822,6 +836,20 @@
             placeholder="https://cloudcode-pa.googleapis.com"
           />
           <p class="input-hint">{{ t('admin.accounts.upstream.baseUrlHint') }}</p>
+          <label v-if="showBaseUrlSkipVersion" class="mt-2 flex items-start">
+            <input
+              v-model="editBaseUrlSkipVersion"
+              type="checkbox"
+              data-testid="base-url-skip-version"
+              class="mr-2 mt-0.5 text-primary-600 focus:ring-primary-500"
+            />
+            <span class="text-sm text-gray-700 dark:text-gray-300">
+              {{ t('admin.accounts.baseUrlSkipVersion') }}
+              <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.accounts.baseUrlSkipVersionHint') }}
+              </span>
+            </span>
+          </label>
         </div>
         <div>
           <label class="input-label">{{ t('admin.accounts.upstream.apiKey') }}</label>
@@ -3117,6 +3145,29 @@ interface TempUnschedRuleForm {
 // State
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
+// 上游把 OpenAI 兼容接口挂在非版本号前缀下且路径不含 /v1（如 https://host/api-proxy/images/generations）
+// 时勾选：网关拼接端点时不再补 /v1。默认关闭，存量渠道拼接行为不变。
+const editBaseUrlSkipVersion = ref(false)
+
+// 勾选时写入 credentials，取消时显式删除——否则旧值会残留在 PUT 的全量 credentials 里。
+function applyBaseUrlSkipVersion(credentials: Record<string, unknown>) {
+  if (showBaseUrlSkipVersion.value && editBaseUrlSkipVersion.value) {
+    credentials.base_url_skip_version = true
+  } else {
+    delete credentials.base_url_skip_version
+  }
+}
+
+// base_url_skip_version 只影响 OpenAI 协议族的端点拼接（openai / grok / 国产兼容供应商）。
+const showBaseUrlSkipVersion = computed(() => {
+  const account = props.account
+  if (!account || (account.type !== 'apikey' && account.type !== 'upstream')) return false
+  return (
+    account.platform === 'openai' ||
+    account.platform === 'grok' ||
+    isCNProviderPlatform(account.platform)
+  )
+})
 const editApiKey = ref('')
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）account_mode / api_protocol 编辑 ──
@@ -4171,6 +4222,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     editBaseUrl.value = isCNApiKeyAccount.value && editApiProtocol.value === 'adaptive'
       ? editAdaptiveBaseUrls.value.chat_completions
       : (credentials.base_url as string) || platformDefaultUrl
+    editBaseUrlSkipVersion.value = credentials.base_url_skip_version === true
 
     // Load model mappings and detect mode
     loadModelRestrictionFromMapping(credentials.model_mapping as Record<string, unknown> | undefined)
@@ -4224,6 +4276,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   } else if (newAccount.type === 'upstream' && newAccount.credentials) {
     const credentials = newAccount.credentials as Record<string, unknown>
     editBaseUrl.value = (credentials.base_url as string) || ''
+    editBaseUrlSkipVersion.value = credentials.base_url_skip_version === true
   } else if ((newAccount.platform === 'gemini' || newAccount.platform === 'anthropic') && newAccount.type === 'service_account' && newAccount.credentials) {
     const credentials = newAccount.credentials as Record<string, unknown>
     editVertexProjectId.value = (credentials.project_id as string) || ''
@@ -4896,6 +4949,7 @@ const handleSubmit = async () => {
         ...currentCredentials,
         base_url: newBaseUrl
       }
+      applyBaseUrlSkipVersion(newCredentials)
 
       // 国产供应商：模式与协议写入凭据（决定额度/余额探测与转发端点/格式）。
       if (isCNApiKeyAccount.value) {
@@ -5012,6 +5066,7 @@ const handleSubmit = async () => {
       const newCredentials: Record<string, unknown> = { ...currentCredentials }
 
       newCredentials.base_url = editBaseUrl.value.trim()
+      applyBaseUrlSkipVersion(newCredentials)
 
       if (editApiKey.value.trim()) {
         newCredentials.api_key = editApiKey.value.trim()

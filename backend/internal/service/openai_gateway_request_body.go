@@ -45,18 +45,19 @@ func (s *OpenAIGatewayService) validateOutboundURL(raw string) (string, error) {
 // - base 以其他版本段结尾（如 /v4）：追加 /responses
 // - base 已是 /responses：原样返回
 // - 其他情况：追加 /v1/responses
-func buildOpenAIResponsesURL(base string) string {
-	return buildOpenAIEndpointURL(base, "/v1/responses")
+// - skipVersion（账号 base_url_skip_version）：恒追加 /responses
+func buildOpenAIResponsesURL(base string, skipVersion bool) string {
+	return buildOpenAIEndpointURL(base, "/v1/responses", skipVersion)
 }
 
 // buildOpenAIResponsesURLForPlatform 组装 Responses 端点（平台感知）。
 // DeepSeek 官方 Responses 端点为 /responses（无 /v1 前缀，适配 Codex）；
 // 其余平台维持 /v1/responses。
-func buildOpenAIResponsesURLForPlatform(platform string, base string) string {
+func buildOpenAIResponsesURLForPlatform(platform string, base string, skipVersion bool) string {
 	if platform == PlatformDeepseek {
-		return buildOpenAIEndpointURL(base, "/responses")
+		return buildOpenAIEndpointURL(base, "/responses", skipVersion)
 	}
-	return buildOpenAIResponsesURL(base)
+	return buildOpenAIResponsesURL(base, skipVersion)
 }
 
 func shouldPreserveOpenAIResponsesNoneReasoningEffort(account *Account) bool {

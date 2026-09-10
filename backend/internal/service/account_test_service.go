@@ -777,7 +777,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		if !openai_compat.ShouldUseResponsesAPI(account.Extra) {
 			return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
 		}
-		apiURL = buildOpenAIResponsesURLForPlatform(credentialAccount.Platform, normalizedBaseURL)
+		apiURL = buildOpenAIResponsesURLForPlatform(credentialAccount.Platform, normalizedBaseURL, credentialAccount.UpstreamBaseURLSkipVersion())
 	} else {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Unsupported account type: %s", account.Type))
 	}
@@ -2029,7 +2029,7 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 	authToken string,
 ) error {
 	ctx := c.Request.Context()
-	apiURL := buildOpenAIChatCompletionsURL(normalizedBaseURL)
+	apiURL := buildOpenAIChatCompletionsURL(normalizedBaseURL, account.UpstreamBaseURLSkipVersion())
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -2123,7 +2123,7 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 		if err != nil {
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 		}
-		apiURL = buildOpenAIResponsesURLForPlatform(account.Platform, normalizedBaseURL)
+		apiURL = buildOpenAIResponsesURLForPlatform(account.Platform, normalizedBaseURL, account.UpstreamBaseURLSkipVersion())
 	default:
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Unsupported account type: %s", account.Type))
 	}
@@ -2934,7 +2934,7 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 	}
-	apiURL := buildOpenAIImagesURL(normalizedBaseURL, openAIImagesGenerationsEndpoint)
+	apiURL := buildOpenAIImagesURL(normalizedBaseURL, openAIImagesGenerationsEndpoint, account.UpstreamBaseURLSkipVersion())
 
 	// Set SSE headers
 	c.Writer.Header().Set("Content-Type", "text/event-stream")

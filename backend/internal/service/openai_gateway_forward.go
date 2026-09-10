@@ -1366,7 +1366,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL)
+			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL, account.UpstreamBaseURLSkipVersion())
 		}
 	default:
 		targetURL = openaiPlatformAPIURL

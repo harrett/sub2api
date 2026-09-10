@@ -5,17 +5,30 @@ import (
 	"strings"
 )
 
-func buildOpenAIEndpointURL(base string, endpoint string) string {
+// buildOpenAIEndpointURL 把 OpenAI 协议端点拼到账号的上游 base URL 上。
+//
+// 默认按 base URL 路径的最后一段是否为版本段（v1 / v4 / v1beta …）推导：是则只
+// 追加去掉 "/v1" 的相对路径，否则追加完整端点。
+//
+// skipVersion 是账号级开关（credentials.base_url_skip_version）：有些上游把
+// OpenAI 兼容接口挂在非版本号前缀下且路径里没有 "/v1"（如
+// https://host/api-proxy/images/generations），此时 base URL 无论怎么填都推导不
+// 出"不要补 /v1"——只能由运维显式声明。开关为 true 时恒用相对路径，不再嗅探版本段。
+func buildOpenAIEndpointURL(base string, endpoint string, skipVersion bool) string {
 	normalized := strings.TrimSpace(base)
 	endpoint = "/" + strings.TrimLeft(strings.TrimSpace(endpoint), "/")
 	relative := strings.TrimPrefix(endpoint, "/v1")
+	suffix := endpoint
+	if skipVersion {
+		suffix = relative
+	}
 	parsed, err := url.Parse(normalized)
 	if err != nil {
-		return strings.TrimRight(normalized, "/") + endpoint
+		return strings.TrimRight(normalized, "/") + suffix
 	}
 	path := strings.TrimRight(parsed.Path, "/")
 	if !strings.HasSuffix(path, endpoint) && !strings.HasSuffix(path, relative) {
-		if openAIBaseURLHasVersionSuffix(path) {
+		if skipVersion || openAIBaseURLHasVersionSuffix(path) {
 			path += relative
 		} else {
 			path += endpoint
@@ -27,8 +40,8 @@ func buildOpenAIEndpointURL(base string, endpoint string) string {
 	return parsed.String()
 }
 
-func buildOpenAIResponsesInputTokensURL(base string) string {
-	return buildOpenAIEndpointURL(base, "/v1/responses/input_tokens")
+func buildOpenAIResponsesInputTokensURL(base string, skipVersion bool) string {
+	return buildOpenAIEndpointURL(base, "/v1/responses/input_tokens", skipVersion)
 }
 
 func openAIBaseURLHasVersionSuffix(raw string) bool {

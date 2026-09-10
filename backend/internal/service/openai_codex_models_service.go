@@ -2571,7 +2571,7 @@ func buildCodexModelsManifestURL(endpoint string, appendModelsPath bool, clientV
 	requestURL.RawQuery = ""
 	requestURL.ForceQuery = false
 	if appendModelsPath {
-		requestURL, err = url.Parse(buildOpenAIModelsURL(requestURL.String()))
+		requestURL, err = url.Parse(buildOpenAIModelsURL(requestURL.String(), false))
 		if err != nil {
 			return nil, err
 		}

@@ -731,23 +731,23 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 func TestBuildOpenAIImagesURL_HandlesVersionedBaseURL(t *testing.T) {
 	require.Equal(t,
 		"https://image-upstream.example/v1/images/generations",
-		buildOpenAIImagesURL("https://image-upstream.example/v1", openAIImagesGenerationsEndpoint),
+		buildOpenAIImagesURL("https://image-upstream.example/v1", openAIImagesGenerationsEndpoint, false),
 	)
 	require.Equal(t,
 		"https://open.bigmodel.cn/api/paas/v4/images/generations",
-		buildOpenAIImagesURL("https://open.bigmodel.cn/api/paas/v4", openAIImagesGenerationsEndpoint),
+		buildOpenAIImagesURL("https://open.bigmodel.cn/api/paas/v4", openAIImagesGenerationsEndpoint, false),
 	)
 	require.Equal(t,
 		"https://image-upstream.example/v1/images/edits",
-		buildOpenAIImagesURL("https://image-upstream.example/v1/", openAIImagesEditsEndpoint),
+		buildOpenAIImagesURL("https://image-upstream.example/v1/", openAIImagesEditsEndpoint, false),
 	)
 	require.Equal(t,
 		"https://image-upstream.example/v1/images/generations",
-		buildOpenAIImagesURL("https://image-upstream.example", openAIImagesGenerationsEndpoint),
+		buildOpenAIImagesURL("https://image-upstream.example", openAIImagesGenerationsEndpoint, false),
 	)
 	require.Equal(t,
 		"https://image-upstream.example/v1/images/generations",
-		buildOpenAIImagesURL("https://image-upstream.example/v1/images/generations", openAIImagesGenerationsEndpoint),
+		buildOpenAIImagesURL("https://image-upstream.example/v1/images/generations", openAIImagesGenerationsEndpoint, false),
 	)
 }
 
