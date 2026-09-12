@@ -899,6 +899,7 @@
               <div>
                 <label class="input-label">{{ t('admin.riskControl.banThreshold') }}</label>
                 <input v-model.number="configForm.ban_threshold" type="number" min="1" max="1000" class="input" />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.banThresholdHint') }}</p>
               </div>
               <div>
                 <label class="input-label">{{ t('admin.riskControl.violationWindowHours') }}</label>

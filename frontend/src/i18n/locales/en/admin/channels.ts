@@ -357,6 +357,7 @@ export default {
       cyberPolicyExcludeBanHint: 'When enabled, cyber_policy hits no longer count toward auto-ban violations: no ban judgment on the hit itself, and history rows are excluded from the rolling count. Logs and notice emails are unaffected.',
       violationNotCounted: 'Not counted',
       banThreshold: 'Ban Threshold',
+      banThresholdHint: 'cyber_policy hits ignore this threshold: a single hit bans the user (unless exempted by the toggle above).',
       violationWindowHours: 'Count Window (hours)',
       hitRetentionDays: 'Hit Record Retention (days)',
       nonHitRetentionDays: 'Non-Hit Record Retention (days, max 3)',

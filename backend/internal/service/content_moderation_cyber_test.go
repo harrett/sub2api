@@ -434,3 +434,84 @@ func TestRecordCyberPolicyEvent_DefaultCountsTowardBan(t *testing.T) {
 	require.Len(t, logs, 1)
 	require.GreaterOrEqual(t, logs[0].ViolationCount, 1, "默认路径行为不变（现状回归）")
 }
+
+// cyber_policy 说明前置拦截已漏放、攻击请求已发到上游，属于已确认的高危行为：
+// 首次命中即封号，不受 BanThreshold 约束。
+func TestApplyFlaggedAccountSideEffects_CyberPolicyBansOnFirstHit(t *testing.T) {
+	cfg := defaultContentModerationConfig()
+	cfg.BanThreshold = 2
+	cfg.ViolationWindowHours = 24
+
+	userID := int64(1001)
+	repo := &contentModerationTestRepo{}
+	userRepo := &contentModerationTestUserRepo{user: &User{ID: userID, Role: RoleUser, Status: StatusActive}}
+	invalidator := &contentModerationTestAuthCacheInvalidator{}
+	svc := NewContentModerationService(nil, repo, nil, nil, userRepo, nil, invalidator, nil)
+
+	log := &ContentModerationLog{
+		UserID:  &userID,
+		Flagged: true,
+		Action:  ContentModerationActionCyberPolicy,
+	}
+	banned := svc.applyFlaggedAccountSideEffects(context.Background(), cfg, log)
+
+	require.True(t, banned, "cyber_policy 首次命中即应封号")
+	require.Equal(t, 1, log.ViolationCount)
+	require.True(t, log.AutoBanned)
+	require.Equal(t, StatusDisabled, userRepo.user.Status)
+	require.Equal(t, []int64{userID}, invalidator.userIDs)
+}
+
+// 非 cyber_policy 命中（keyword/API）必须仍按配置阈值累计，首次命中不封号。
+func TestApplyFlaggedAccountSideEffects_KeywordStillHonorsThreshold(t *testing.T) {
+	cfg := defaultContentModerationConfig()
+	cfg.BanThreshold = 2
+	cfg.ViolationWindowHours = 24
+
+	userID := int64(1001)
+	repo := &contentModerationTestRepo{}
+	userRepo := &contentModerationTestUserRepo{user: &User{ID: userID, Role: RoleUser, Status: StatusActive}}
+	invalidator := &contentModerationTestAuthCacheInvalidator{}
+	svc := NewContentModerationService(nil, repo, nil, nil, userRepo, nil, invalidator, nil)
+
+	log := &ContentModerationLog{
+		UserID:  &userID,
+		Flagged: true,
+		Action:  ContentModerationActionKeywordBlock,
+	}
+	banned := svc.applyFlaggedAccountSideEffects(context.Background(), cfg, log)
+
+	require.False(t, banned, "关键词命中第 1 次不得封号（阈值 2）")
+	require.Equal(t, 1, log.ViolationCount)
+	require.False(t, log.AutoBanned)
+	require.Equal(t, StatusActive, userRepo.user.Status)
+	require.Empty(t, invalidator.userIDs)
+}
+
+// RecordCyberPolicyEvent 端到端：默认配置（阈值 2、不豁免）下首次 cyber 命中即封号。
+func TestRecordCyberPolicyEvent_BansUserOnFirstHit(t *testing.T) {
+	repo := &banCountArgsTestRepo{}
+	userRepo := &contentModerationTestUserRepo{user: &User{ID: 1, Role: RoleUser, Status: StatusActive}}
+	svc := NewContentModerationService(
+		&contentModerationTestSettingRepo{values: map[string]string{
+			SettingKeyRiskControlEnabled:      "true",
+			SettingKeyContentModerationConfig: `{"auto_ban_enabled":true,"ban_threshold":2,"violation_window_hours":24}`,
+		}},
+		repo, nil, nil, userRepo, nil, nil, nil,
+	)
+
+	svc.RecordCyberPolicyEvent(context.Background(), CyberPolicyRecordInput{
+		UserID:          1,
+		UserEmail:       "u@x.com",
+		Model:           "gpt-5",
+		Endpoint:        "/v1/responses",
+		UpstreamMessage: "flagged",
+		UpstreamStatus:  400,
+	})
+
+	logs := repo.snapshotLogs()
+	require.Len(t, logs, 1)
+	require.Equal(t, 1, logs[0].ViolationCount)
+	require.True(t, logs[0].AutoBanned, "首次 cyber_policy 命中必须封号")
+	require.Equal(t, StatusDisabled, userRepo.user.Status)
+}

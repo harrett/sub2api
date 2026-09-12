@@ -357,6 +357,7 @@ export default {
       cyberPolicyExcludeBanHint: '开启后，cyber_policy 拦截不再计入自动封号的违规次数：当次不判定封号，历史累计亦排除。风控日志与通知邮件照常。',
       violationNotCounted: '未计入封号',
       banThreshold: '封禁触发次数',
+      banThresholdHint: 'cyber_policy 命中不受此阈值限制：一次即封（除非上方开关豁免）。',
       violationWindowHours: '累计窗口（小时）',
       hitRetentionDays: '命中记录保留（天）',
       nonHitRetentionDays: '未命中记录保留（天，最多 3 天）',

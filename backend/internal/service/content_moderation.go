@@ -1908,6 +1908,21 @@ func (s *ContentModerationService) persistContentModerationLog(ctx context.Conte
 	}
 }
 
+// contentModerationEffectiveBanThreshold 返回该条命中实际适用的封号阈值。
+// cyber_policy 命中意味着前置拦截（关键词/审计 API）已经漏放，请求真实发到了上游并被
+// 上游安全策略判定为攻击——属于已确认的高危行为，因此一次即封，不受 BanThreshold 约束。
+// 其余命中（keyword/API/hash）仍按配置阈值累计。
+// 注意：cfg.CyberPolicyExcludeFromBanCount 开启时调用方根本不会进到这里，该开关仍是总的豁免。
+func contentModerationEffectiveBanThreshold(cfg *ContentModerationConfig, log *ContentModerationLog) int {
+	if log != nil && log.Action == ContentModerationActionCyberPolicy {
+		return 1
+	}
+	if cfg == nil {
+		return 0
+	}
+	return cfg.BanThreshold
+}
+
 func (s *ContentModerationService) applyFlaggedAccountSideEffects(ctx context.Context, cfg *ContentModerationConfig, log *ContentModerationLog) bool {
 	if s == nil || cfg == nil || log == nil || !log.Flagged || log.UserID == nil || *log.UserID <= 0 {
 		return false
@@ -1921,14 +1936,15 @@ func (s *ContentModerationService) applyFlaggedAccountSideEffects(ctx context.Co
 	}
 	log.ViolationCount = count
 	autoBanJustApplied := false
-	if cfg.AutoBanEnabled && cfg.BanThreshold > 0 && count >= cfg.BanThreshold && s.userRepo != nil {
+	banThreshold := contentModerationEffectiveBanThreshold(cfg, log)
+	if cfg.AutoBanEnabled && banThreshold > 0 && count >= banThreshold && s.userRepo != nil {
 		user, err := s.userRepo.GetByID(ctx, *log.UserID)
 		if err != nil {
 			slog.Warn("content_moderation.ban_get_user_failed", "user_id", *log.UserID, "error", err)
 			return false
 		}
 		if user.IsAdmin() {
-			slog.Warn("content_moderation.autoban_skipped_admin", "user_id", *log.UserID, "role", user.Role, "count", count, "threshold", cfg.BanThreshold)
+			slog.Warn("content_moderation.autoban_skipped_admin", "user_id", *log.UserID, "role", user.Role, "count", count, "threshold", banThreshold)
 			// TODO: Disable the triggering API key instead when API key mutation is available here.
 			return false
 		}
@@ -2060,7 +2076,7 @@ func contentModerationEmailVariables(log *ContentModerationLog, cfg *ContentMode
 		variables["violation_count"] = fmt.Sprintf("%d", log.ViolationCount)
 	}
 	if cfg != nil {
-		variables["ban_threshold"] = fmt.Sprintf("%d", cfg.BanThreshold)
+		variables["ban_threshold"] = fmt.Sprintf("%d", contentModerationEffectiveBanThreshold(cfg, log))
 	}
 	return variables
 }

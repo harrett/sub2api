@@ -15,7 +15,7 @@ func buildContentModerationViolationEmailBody(siteName string, log *ContentModer
 	if userName == "" && log.UserID != nil {
 		userName = fmt.Sprintf("UID %d", *log.UserID)
 	}
-	threshold := cfg.BanThreshold
+	threshold := contentModerationEffectiveBanThreshold(cfg, log)
 	if threshold <= 0 {
 		threshold = defaultContentModerationBanThreshold
 	}
@@ -68,7 +68,7 @@ func buildContentModerationAccountDisabledEmailBody(siteName string, log *Conten
 	if userName == "" && log.UserID != nil {
 		userName = fmt.Sprintf("UID %d", *log.UserID)
 	}
-	threshold := cfg.BanThreshold
+	threshold := contentModerationEffectiveBanThreshold(cfg, log)
 	if threshold <= 0 {
 		threshold = defaultContentModerationBanThreshold
 	}
