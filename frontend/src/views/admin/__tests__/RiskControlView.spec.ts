@@ -15,6 +15,7 @@ const {
   getProxies,
   showError,
   showSuccess,
+  routerPush,
 } = vi.hoisted(() => ({
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
@@ -24,6 +25,7 @@ const {
   getProxies: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
+  routerPush: vi.fn(),
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -56,6 +58,10 @@ vi.mock('@/stores/app', () => ({
 
 vi.mock('@/utils/apiError', () => ({
   extractApiErrorMessage: (_err: unknown, fallback: string) => fallback,
+}))
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: routerPush }),
 }))
 
 vi.mock('vue-i18n', async () => {
@@ -414,5 +420,79 @@ describe('admin RiskControlView', () => {
       'max-h-[280px]',
       'overflow-y-auto',
     ]))
+  })
+
+  // 风控日志不存上游账号，只能靠 request_id 去运维错误明细里查；
+  // 跳转必须带上自定义时间窗，否则默认 1h 档位看不到历史命中。
+  it('deep-links a moderation row to the ops error details by request id', async () => {
+    routerPush.mockReset()
+    listLogs.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          request_id: 'req_cyber_001',
+          user_id: 888,
+          user_email: 'u@x.com',
+          api_key_id: 2,
+          api_key_name: 'key',
+          group_id: null,
+          group_name: '',
+          endpoint: '/v1/responses',
+          provider: 'openai',
+          model: 'gpt-5.5',
+          mode: 'post_upstream',
+          action: 'cyber_policy',
+          flagged: true,
+          highest_category: 'cyber_policy',
+          highest_score: 1,
+          matched_keyword: '',
+          category_scores: {},
+          threshold_snapshot: {},
+          input_excerpt: 'This content was flagged',
+          error: '',
+          violation_count: 1,
+          auto_banned: true,
+          email_sent: true,
+          user_status: 'disabled',
+          created_at: '2026-09-10T03:44:41.000Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+
+    const wrapper = mount(RiskControlView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          BaseDialog: BaseDialogStub,
+          Icon: true,
+          Select: true,
+          Toggle: true,
+          Pagination: true,
+          ModelWhitelistSelector: ModelWhitelistSelectorStub,
+          ProxySelector: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    await findButtonByText(wrapper, 'This content was flagged').trigger('click')
+    expect(wrapper.text()).toContain('req_cyber_001')
+
+    await findButtonByText(wrapper, 'admin.riskControl.viewInErrorLogs').trigger('click')
+
+    expect(routerPush).toHaveBeenCalledTimes(1)
+    const target = routerPush.mock.calls[0][0] as { path: string; query: Record<string, string> }
+    expect(target.path).toBe('/admin/ops')
+    expect(target.query.open_error_details).toBe('1')
+    expect(target.query.error_type).toBe('request')
+    expect(target.query.error_q).toBe('req_cyber_001')
+    expect(target.query.tr).toBe('custom')
+    expect(new Date(target.query.cs).toISOString()).toBe('2026-09-10T03:34:41.000Z')
+    expect(new Date(target.query.ce).toISOString()).toBe('2026-09-10T03:54:41.000Z')
   })
 })

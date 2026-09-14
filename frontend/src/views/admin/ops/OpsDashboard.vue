@@ -120,6 +120,7 @@
           :group-id="groupId"
           :error-type="errorDetailsType"
           :resume-state="resumeListState"
+          :initial-search="errorDetailsInitialSearch"
           @update:show="showErrorDetails = $event"
           @openErrorDetail="openError($event, errorDetailsType)"
         />
@@ -219,6 +220,9 @@ const QUERY_KEYS = {
   // Deep links
   openErrorDetails: 'open_error_details',
   errorType: 'error_type',
+  errorSearch: 'error_q',
+  customStart: 'cs',
+  customEnd: 'ce',
   alertRuleId: 'alert_rule_id',
   openAlertRules: 'open_alert_rules'
 } as const
@@ -312,10 +316,19 @@ const applyRouteQueryToState = () => {
     showAlertRulesCard.value = true
   }
 
+  // 自定义时间窗（深链定位历史请求时必须，预设档位最长只有 24h）。
+  const start = readQueryString(QUERY_KEYS.customStart)
+  const end = readQueryString(QUERY_KEYS.customEnd)
+  if (start && end) {
+    customStartTime.value = start
+    customEndTime.value = end
+  }
+
   const openErr = readQueryString(QUERY_KEYS.openErrorDetails)
   if (openErr === '1' || openErr === 'true') {
     const typ = readQueryString(QUERY_KEYS.errorType)
     errorDetailsType.value = typ === 'upstream' ? 'upstream' : 'request'
+    errorDetailsInitialSearch.value = readQueryString(QUERY_KEYS.errorSearch)
     showErrorDetails.value = true
   }
 }
@@ -331,6 +344,11 @@ const buildQueryFromState = () => {
   if (platform.value) next[QUERY_KEYS.platform] = platform.value
   if (typeof groupId.value === 'number' && groupId.value > 0) next[QUERY_KEYS.groupId] = String(groupId.value)
   if (queryMode.value !== 'auto') next[QUERY_KEYS.queryMode] = queryMode.value
+  // 自定义窗口保留在 URL 里，刷新/分享链接不会丢失时间范围。
+  if (timeRange.value === 'custom' && customStartTime.value && customEndTime.value) {
+    next[QUERY_KEYS.customStart] = customStartTime.value
+    next[QUERY_KEYS.customEnd] = customEndTime.value
+  }
 
   return next
 }
@@ -380,6 +398,8 @@ const showErrorModal = ref(false)
 
 const showErrorDetails = ref(false)
 const errorDetailsType = ref<'request' | 'upstream'>('request')
+// 深链带入的搜索词（风控中心按 request_id 跳转过来查账号）；一次性，仅首次打开时生效。
+const errorDetailsInitialSearch = ref('')
 
 const showRequestDetails = ref(false)
 const requestDetailsPreset = ref<OpsRequestDetailsPreset>({

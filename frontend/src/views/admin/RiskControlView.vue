@@ -1091,6 +1091,13 @@
               <p class="text-xs font-medium text-red-500 dark:text-red-300">{{ t('admin.riskControl.matchedKeyword') }}</p>
               <p class="mt-1 truncate text-sm font-semibold text-red-700 dark:text-red-200" :title="inputDetailRow.matched_keyword">{{ inputDetailRow.matched_keyword }}</p>
             </div>
+            <div v-if="inputDetailRow.request_id" class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70 sm:col-span-2">
+              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.requestId') }}</p>
+              <p class="mt-1 truncate font-mono text-sm font-semibold text-gray-900 dark:text-white" :title="inputDetailRow.request_id">
+                {{ inputDetailRow.request_id }}
+              </p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.requestIdHint') }}</p>
+            </div>
           </div>
 
           <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
@@ -1110,7 +1117,15 @@
         </div>
 
         <template #footer>
-          <div class="flex justify-end">
+          <div class="flex justify-end gap-3">
+            <button
+              v-if="inputDetailRow?.request_id"
+              type="button"
+              class="btn btn-primary"
+              @click="openErrorLogForRow(inputDetailRow)"
+            >
+              {{ t('admin.riskControl.viewInErrorLogs') }}
+            </button>
             <button type="button" class="btn btn-secondary" @click="closeInputDetail">{{ t('common.close') }}</button>
           </div>
         </template>
@@ -1122,6 +1137,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -1197,6 +1213,7 @@ const riskThresholdDefaults: Record<string, number> = {
 const riskThresholdCategories = Object.keys(riskThresholdDefaults)
 
 const { t } = useI18n()
+const router = useRouter()
 const appStore = useAppStore()
 const defaultBlockMessage = () => t('admin.riskControl.defaultBlockMessage')
 
@@ -1891,6 +1908,25 @@ function openInputDetail(row: ContentModerationLog) {
 
 function closeInputDetail() {
   inputDetailRow.value = null
+}
+
+// 风控日志不存上游账号（审计发生在账号调度之前，cyber_policy 只是复用了同一张表），
+// 账号记录在 ops_error_logs 里。按 request_id 跳到运维监控的错误明细即可查出账号。
+function openErrorLogForRow(row: ContentModerationLog | null) {
+  if (!row?.request_id) return
+  const hitAt = new Date(row.created_at).getTime()
+  const query: Record<string, string> = {
+    open_error_details: '1',
+    error_type: 'request',
+    error_q: row.request_id,
+  }
+  if (Number.isFinite(hitAt)) {
+    const windowMs = 10 * 60 * 1000
+    query.tr = 'custom'
+    query.cs = new Date(hitAt - windowMs).toISOString()
+    query.ce = new Date(hitAt + windowMs).toISOString()
+  }
+  router.push({ path: '/admin/ops', query })
 }
 
 async function unbanUser(row: ContentModerationLog) {
