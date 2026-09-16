@@ -770,6 +770,7 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 		AccountRateMultiplier:   l.AccountRateMultiplier,
 		AccountStatsCost:        l.AccountStatsCost,
 		IPAddress:               l.IPAddress,
+		UserNotes:               adminUserNotes(l.User),
 		Account:                 AccountSummaryFromService(l.Account),
 	}
 }
@@ -876,8 +877,19 @@ func UserSubscriptionFromServiceAdmin(sub *service.UserSubscription) *AdminUserS
 		AssignedBy:       sub.AssignedBy,
 		AssignedAt:       sub.AssignedAt,
 		Notes:            sub.Notes,
+		UserNotes:        adminUserNotes(sub.User),
 		AssignedByUser:   UserFromServiceShallow(sub.AssignedByUser),
 	}
+}
+
+// adminUserNotes exposes the admin-only user notes on admin DTOs. The shared
+// User DTO deliberately omits notes so user-facing endpoints cannot leak them.
+func adminUserNotes(u *service.User) *string {
+	if u == nil || u.Notes == "" {
+		return nil
+	}
+	notes := u.Notes
+	return &notes
 }
 
 func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscription {

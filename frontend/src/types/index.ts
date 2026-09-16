@@ -1783,6 +1783,9 @@ export interface AdminUsageLog extends UsageLog {
   channel_id?: number | null
   billing_tier?: string | null
 
+  // 用户的管理员备注（仅管理员接口返回，User 上不含 notes）
+  user_notes?: string | null
+
   // 最小账号信息（仅管理员接口返回）
   account?: UsageLogAccountSummary
 }
@@ -2069,6 +2072,8 @@ export interface UserSubscription {
   expires_at: string | null
   user?: User
   group?: Group
+  // 用户的管理员备注，仅管理员订阅接口返回（User 上不含 notes）
+  user_notes?: string | null
 }
 
 export interface SubscriptionProgress {

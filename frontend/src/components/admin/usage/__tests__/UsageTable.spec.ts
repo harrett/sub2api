@@ -853,4 +853,41 @@ describe('admin UsageTable deleted-user badge', () => {
     expect(wrapper.text()).not.toContain('Deleted')
     expect(wrapper.text()).toContain('active@test.com')
   })
+
+  it('renders username and admin notes next to the user email', () => {
+    const row = {
+      request_id: 'req-user-notes-1',
+      model: 'claude-3',
+      user_id: 4,
+      user: { id: 4, email: 'noted@test.com', username: 'noted-user', deleted_at: null },
+      user_notes: 'VIP customer',
+      actual_cost: 0,
+      total_cost: 0,
+      input_cost: 0,
+      output_cost: 0,
+      rate_multiplier: 1,
+      input_tokens: 1,
+      output_tokens: 1,
+    }
+
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [row],
+        loading: false,
+        columns: [{ key: 'user', label: 'User' }],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStubWithUser,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('noted@test.com')
+    expect(wrapper.text()).toContain('noted-user')
+    expect(wrapper.text()).toContain('VIP customer')
+  })
 })

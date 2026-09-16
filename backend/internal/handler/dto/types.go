@@ -699,6 +699,9 @@ type AdminUsageLog struct {
 	// IPAddress 用户请求 IP
 	IPAddress *string `json:"ip_address,omitempty"`
 
+	// UserNotes 是该用户的管理员备注，仅管理端可见（User DTO 不含 notes）。
+	UserNotes *string `json:"user_notes,omitempty"`
+
 	// Account 最小账号信息（避免泄露敏感字段）
 	Account *AccountSummary `json:"account,omitempty"`
 }
@@ -778,6 +781,9 @@ type AdminUserSubscription struct {
 	AssignedBy *int64    `json:"assigned_by"`
 	AssignedAt time.Time `json:"assigned_at"`
 	Notes      string    `json:"notes"`
+
+	// UserNotes 是订阅所属用户的管理员备注，仅管理端可见（User DTO 不含 notes）。
+	UserNotes *string `json:"user_notes,omitempty"`
 
 	AssignedByUser *User `json:"assigned_by_user,omitempty"`
 }
