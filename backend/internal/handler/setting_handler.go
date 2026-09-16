@@ -96,6 +96,7 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		GoogleOAuthEnabled:                  settings.GoogleOAuthEnabled,
 		BackendModeEnabled:                  settings.BackendModeEnabled,
 		PaymentEnabled:                      settings.PaymentEnabled,
+		PaymentBalanceDisabled:              settings.PaymentBalanceDisabled,
 		Version:                             h.version,
 		ServerTimezone:                      timezone.Name(),
 		ServerUTCOffset:                     timezone.UTCOffset(),
@@ -113,6 +114,7 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 
 		AvailableChannelsEnabled:   settings.AvailableChannelsEnabled,
 		BundleSubscriptionsEnabled: settings.BundleSubscriptionsEnabled,
+		SubscriptionEnabled:        settings.SubscriptionEnabled,
 
 		ModelPlazaEnabled:       settings.ModelPlazaEnabled,
 		ModelPlazaRequireAuth:   settings.ModelPlazaRequireAuth,

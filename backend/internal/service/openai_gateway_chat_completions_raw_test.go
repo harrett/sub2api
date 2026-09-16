@@ -46,7 +46,7 @@ func TestBuildOpenAIChatCompletionsURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := buildOpenAIChatCompletionsURL(tt.base)
+			got := buildOpenAIChatCompletionsURL(tt.base, false)
 			require.Equal(t, tt.want, got)
 		})
 	}
@@ -74,7 +74,7 @@ func TestBuildOpenAIResponsesURL_ProbeURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := buildOpenAIResponsesURL(tt.base)
+			got := buildOpenAIResponsesURL(tt.base, false)
 			require.Equal(t, tt.want, got)
 		})
 	}
