@@ -43,6 +43,8 @@
 </template>
 
 <script lang="ts">
+let dialogIdCounter = 0
+
 // 打开中的对话框栈(模块级,所有实例共享),用于支持嵌套弹窗:
 // 1. 滚动锁定按栈计数,子弹窗关闭时不会提前解锁仍打开的父弹窗
 // 2. Escape 只关闭栈顶(最上层)的弹窗
@@ -73,7 +75,6 @@ import { computed, watch, onMounted, onUnmounted, ref, nextTick } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 
 // 生成唯一ID以避免多个对话框时ID冲突
-let dialogIdCounter = 0
 const dialogId = `modal-title-${++dialogIdCounter}`
 const dialogToken = Symbol('base-dialog')
 
