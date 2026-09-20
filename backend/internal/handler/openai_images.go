@@ -222,6 +222,18 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		reqLog.Debug("openai.images.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
+		// 图像模型名的前缀门在选中账号之后才判定：第三方上游的图像模型名不可枚举，
+		// 只有账号的 model_mapping 能声明它们。这里失败是客户端错误，不切换账号。
+		if err := service.ValidateOpenAIImagesAccountModel(account, parsed, channelMapping.MappedModel); err != nil {
+			reqLog.Info("openai.images.model_rejected",
+				zap.Int64("account_id", account.ID),
+				zap.String("model", clientRequestModel),
+				zap.Error(err),
+			)
+			h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), streamStarted)
+			return
+		}
+
 		accountReleaseFunc, slotResult := h.acquireResponsesAccountSlot(c, apiKey.GroupID, sessionHash, selection, parsed.Stream, &streamStarted, reqLog)
 		if slotResult == openAISlotAcquireProfitVetoed {
 			// Images 调度不装利润门，此分支实际不可达；防御性排除重选并受同一否决上限约束。

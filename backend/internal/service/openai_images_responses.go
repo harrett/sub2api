@@ -1796,13 +1796,10 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	if requestModel == "" {
 		requestModel = "gpt-image-2"
 	}
-	if err := validateOpenAIImagesModel(requestModel); err != nil {
+	if err := ValidateOpenAIImagesAccountModel(account, parsed, channelMappedModel); err != nil {
 		return nil, err
 	}
 	upstreamModel := account.GetMappedModel(requestModel)
-	if err := validateOpenAIImagesModel(upstreamModel); err != nil {
-		return nil, err
-	}
 	direct := usesCodexDirectImages(upstreamModel) && !isOpenAIImagesForceResponses(ctx)
 	beginUpstreamResponseModelObservation(c)
 	SetOpsUpstreamModel(c, upstreamModel)

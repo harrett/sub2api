@@ -100,6 +100,11 @@ type OpenAIImagesRequest struct {
 	MaskUpload         *OpenAIImagesUpload
 	Body               []byte
 	bodyHash           string
+	// modelValidationErr 记录入站模型名是否通过了图像模型前缀门。
+	// 解析阶段还没选账号，而「这个名字是不是图像模型」对第三方上游只有账号的
+	// model_mapping 能回答，所以此处只记录不报错，判定推迟到
+	// ValidateOpenAIImagesAccountModel。
+	modelValidationErr error
 }
 
 func (r *OpenAIImagesRequest) ModerationBody() []byte {
@@ -227,9 +232,9 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 	}
 
 	applyOpenAIImagesDefaults(req)
-	if err := validateOpenAIImagesModel(req.Model); err != nil {
-		return nil, err
-	}
+	// 前缀门的判定推迟到选中账号之后，见 modelValidationErr 与
+	// ValidateOpenAIImagesAccountModel。
+	req.modelValidationErr = validateOpenAIImagesModel(req.Model)
 	req.SizeTier = normalizeOpenAIImageSizeTier(req.Size)
 	req.RequiredCapability = classifyOpenAIImagesCapability(req)
 	return req, nil
@@ -494,6 +499,62 @@ func validateOpenAIImagesModel(model string) error {
 	return fmt.Errorf("images endpoint requires an image model, got %q", model)
 }
 
+// ValidateOpenAIImagesAccountModel 在账号选定之后判定图像模型名是否可用。
+//
+// 默认仍按 gpt-image-* / grok-imagine* 前缀门放行——那是把文本模型误打到
+// /v1/images/* 时的快速失败路径，必须保留。
+//
+// 但账号的 model_mapping 里显式写死了该模型名时跳过前缀门：运维写下这条映射，
+// 就是在声明「这个名字是该上游的图像模型」，网关没有比它更权威的依据。第三方
+// OpenAI 兼容上游的图像模型名不可枚举（Banana-2-Pro、完全无限制-Z-Image、
+// Grok-image-2.0 等都是正经的 images 端点模型），把它们硬编码进前缀判定既跟不上
+// 新增厂商，也会污染 isOpenAIImageGenerationModel 的其余十几个调用点（定价、限流、
+// 图像意图识别、Codex 改写）。
+//
+// 只认精确键，不认通配符：`gpt-*` 这类宽映射不构成对某个具体模型的声明，仍走前缀门。
+// 空映射（= 允许所有模型）同样不构成声明。
+func ValidateOpenAIImagesAccountModel(account *Account, parsed *OpenAIImagesRequest, channelMappedModel string) error {
+	if parsed == nil {
+		return nil
+	}
+	inboundModel := strings.TrimSpace(parsed.Model)
+	requestModel := inboundModel
+	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
+		requestModel = mapped
+	}
+	if requestModel == "" {
+		requestModel = "gpt-image-2"
+	}
+	if accountDeclaresImagesModel(account, inboundModel) || accountDeclaresImagesModel(account, requestModel) {
+		return nil
+	}
+	// 入站名没过前缀门时原样复用解析阶段的错误，保持报文与推迟判定前逐字一致。
+	if parsed.modelValidationErr != nil {
+		return parsed.modelValidationErr
+	}
+	if err := validateOpenAIImagesModel(requestModel); err != nil {
+		return err
+	}
+	if account == nil {
+		return nil
+	}
+	return validateOpenAIImagesModel(account.GetMappedModel(requestModel))
+}
+
+// accountDeclaresImagesModel 报告账号的 model_mapping 是否精确声明了该模型名。
+func accountDeclaresImagesModel(account *Account, model string) bool {
+	model = strings.TrimSpace(model)
+	if account == nil || model == "" {
+		return false
+	}
+	mapping := account.GetModelMapping()
+	if len(mapping) == 0 {
+		return false
+	}
+	_, ok := mapping[model]
+	return ok
+}
+
 func normalizeOpenAIImagesEndpointPath(path string) string {
 	trimmed := strings.TrimSpace(path)
 	switch {
@@ -594,13 +655,10 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
 		requestModel = mapped
 	}
-	if err := validateOpenAIImagesModel(requestModel); err != nil {
+	if err := ValidateOpenAIImagesAccountModel(account, parsed, channelMappedModel); err != nil {
 		return nil, err
 	}
 	upstreamModel := account.GetMappedModel(requestModel)
-	if err := validateOpenAIImagesModel(upstreamModel); err != nil {
-		return nil, err
-	}
 	SetOpsUpstreamModel(c, upstreamModel)
 	logger.LegacyPrintf(
 		"service.openai_gateway",

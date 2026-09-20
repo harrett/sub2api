@@ -326,6 +326,9 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_ExplicitSizeRequiresNative
 	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
 }
 
+// 前缀门的判定从解析阶段推迟到了选中账号之后（账号的 model_mapping 才能声明第三方
+// 上游的图像模型名）。解析本身不再报错，但未被账号声明的文本模型仍然得到逐字相同的
+// 那句 400。
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_RejectsNonImageModel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	body := []byte(`{"model":"gpt-5.4","prompt":"draw a cat"}`)
@@ -338,8 +341,104 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_RejectsNonImageModel(t *te
 
 	svc := &OpenAIGatewayService{}
 	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
-	require.Nil(t, parsed)
-	require.ErrorContains(t, err, `images endpoint requires an image model, got "gpt-5.4"`)
+	require.NoError(t, err)
+	require.NotNil(t, parsed)
+
+	// 空映射（= 允许所有模型）不构成声明，仍然被前缀门拦住。
+	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	require.ErrorContains(t,
+		ValidateOpenAIImagesAccountModel(account, parsed, ""),
+		`images endpoint requires an image model, got "gpt-5.4"`,
+	)
+	// 没有账号上下文时同样保持原判定。
+	require.ErrorContains(t,
+		ValidateOpenAIImagesAccountModel(nil, parsed, ""),
+		`images endpoint requires an image model, got "gpt-5.4"`,
+	)
+}
+
+func parseOpenAIImagesRequestForModel(t *testing.T, model string) *OpenAIImagesRequest {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	body := []byte(fmt.Sprintf(`{"model":%q,"prompt":"draw a cat"}`, model))
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	parsed, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	require.NotNil(t, parsed)
+	return parsed
+}
+
+func openAIImagesAccountWithMapping(mapping map[string]any) *Account {
+	return &Account{
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Credentials: map[string]any{"base_url": "https://api.image2pro.top", "model_mapping": mapping},
+	}
+}
+
+// 第三方上游的图像模型名不可枚举；账号显式声明后必须放行，否则这些渠道接不进来。
+func TestValidateOpenAIImagesAccountModel_ExplicitMappingUnlocksNonPrefixModels(t *testing.T) {
+	cases := []struct {
+		inbound  string
+		upstream string
+	}{
+		{inbound: "banana-2-pro", upstream: "Banana-2-Pro"},
+		{inbound: "grok-image-2.0", upstream: "Grok-image-2.0"},
+		{inbound: "z-image", upstream: "完全无限制-Z-Image"},
+		{inbound: "seedream-5-pro", upstream: "无限制-Seedream-5-Pro"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.inbound, func(t *testing.T) {
+			parsed := parseOpenAIImagesRequestForModel(t, tt.inbound)
+			account := openAIImagesAccountWithMapping(map[string]any{tt.inbound: tt.upstream})
+			require.NoError(t, ValidateOpenAIImagesAccountModel(account, parsed, ""))
+
+			// 未声明该名字的账号仍然拒绝，保证解锁范围限定在显式映射上。
+			other := openAIImagesAccountWithMapping(map[string]any{"gpt-image-2.5": "GPT-Image-2.5"})
+			require.ErrorContains(t,
+				ValidateOpenAIImagesAccountModel(other, parsed, ""),
+				"images endpoint requires an image model",
+			)
+		})
+	}
+}
+
+// 通配符是「把一切路由到这个上游」，不是对某个具体模型的声明；不能用它绕开前缀门。
+func TestValidateOpenAIImagesAccountModel_WildcardMappingDoesNotUnlock(t *testing.T) {
+	parsed := parseOpenAIImagesRequestForModel(t, "banana-2-pro")
+	for _, pattern := range []string{"*", "banana-*"} {
+		t.Run(pattern, func(t *testing.T) {
+			account := openAIImagesAccountWithMapping(map[string]any{pattern: "Banana-2-Pro"})
+			require.ErrorContains(t,
+				ValidateOpenAIImagesAccountModel(account, parsed, ""),
+				`images endpoint requires an image model, got "banana-2-pro"`,
+			)
+		})
+	}
+}
+
+// gpt-image-* / grok-imagine* 无需任何映射即可通过，与推迟判定前一致。
+func TestValidateOpenAIImagesAccountModel_PrefixModelsStillPassWithoutMapping(t *testing.T) {
+	for _, model := range []string{"gpt-image-2", "gpt-image-2.5", "grok-imagine", "grok-imagine-image-quality"} {
+		t.Run(model, func(t *testing.T) {
+			parsed := parseOpenAIImagesRequestForModel(t, model)
+			account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+			require.NoError(t, ValidateOpenAIImagesAccountModel(account, parsed, ""))
+		})
+	}
+}
+
+// 映射后的上游名同样要过门：声明了入站名就连带信任它的目标名。
+func TestValidateOpenAIImagesAccountModel_MappedUpstreamNameIsTrusted(t *testing.T) {
+	parsed := parseOpenAIImagesRequestForModel(t, "gpt-image-2.5")
+	account := openAIImagesAccountWithMapping(map[string]any{"gpt-image-2.5": "GPT-Image-2.5 0.01/张"})
+	require.NoError(t, ValidateOpenAIImagesAccountModel(account, parsed, ""))
 }
 
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_AllowsGrokImageModels(t *testing.T) {
