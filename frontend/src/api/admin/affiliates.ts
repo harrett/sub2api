@@ -46,25 +46,35 @@ export interface AffiliateInviteRecord {
   created_at: string
 }
 
+/**
+ * One rebate accrual. Non-order sources (redeem codes, admin recharges) carry no
+ * order, so order fields are null; invitee_id is null when the invitee account
+ * was deleted.
+ */
 export interface AffiliateRebateRecord {
-  order_id: number
+  order_id: number | null
   out_trade_no: string
   inviter_id: number
   inviter_email: string
   inviter_username: string
-  invitee_id: number
+  invitee_id: number | null
   invitee_email: string
   invitee_username: string
-  order_amount: number
-  pay_amount: number
+  order_amount: number | null
+  pay_amount: number | null
   rebate_amount: number
   payment_type: string
   order_status: string
   created_at: string
 }
 
+/** transfer = user moved quota into balance; withdraw = admin-recorded offline withdrawal. */
+export type AffiliateOutflowAction = 'transfer' | 'withdraw'
+
+/** One affiliate quota outflow: a transfer into balance or an offline withdrawal. */
 export interface AffiliateTransferRecord {
   ledger_id: number
+  action: AffiliateOutflowAction
   user_id: number
   user_email: string
   username: string
@@ -138,6 +148,26 @@ export interface AffiliateTopHalfSummary {
   top_half_invite_count: number
   top_half_invite_percent: number
   items: AffiliateTopHalfInviter[]
+}
+
+export interface WithdrawAffiliateQuotaRequest {
+  /** Amount already paid to the user outside the site (USD). */
+  amount: number
+}
+
+export interface AffiliateWithdrawResult {
+  ledger_id: number
+  user_id: number
+  amount: number
+  available_quota_after: number
+  frozen_quota_after: number
+  history_quota_after: number
+}
+
+export interface AffiliateWithdrawResponse {
+  result: AffiliateWithdrawResult
+  /** True when the key matched an earlier registration and nothing was deducted again. */
+  replayed: boolean
 }
 
 export interface AffiliateUserOverview {
@@ -333,6 +363,27 @@ export async function getUserOverview(
   return data
 }
 
+/**
+ * Records an offline withdrawal. `idempotencyKey` identifies one registration:
+ * a retry with the same key deducts nothing and returns the first result, with
+ * `replayed` set.
+ */
+export async function withdrawUserQuota(
+  userId: number,
+  payload: WithdrawAffiliateQuotaRequest,
+  idempotencyKey: string,
+): Promise<AffiliateWithdrawResponse> {
+  const response = await apiClient.post<AffiliateWithdrawResult>(
+    `/admin/affiliates/users/${userId}/withdraw`,
+    payload,
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return {
+    result: response.data,
+    replayed: response.headers?.['x-idempotency-replayed'] === 'true',
+  }
+}
+
 export const affiliatesAPI = {
   listUsers,
   lookupUsers,
@@ -346,6 +397,7 @@ export const affiliatesAPI = {
   getInviteTimeline,
   getTopHalfInviters,
   getUserOverview,
+  withdrawUserQuota,
 }
 
 export default affiliatesAPI

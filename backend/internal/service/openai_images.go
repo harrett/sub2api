@@ -59,6 +59,8 @@ type OpenAIImagesCapability string
 const (
 	OpenAIImagesCapabilityBasic  OpenAIImagesCapability = "images-basic"
 	OpenAIImagesCapabilityNative OpenAIImagesCapability = "images-native"
+	// Compatible provider models require the API-key Images passthrough path.
+	OpenAIImagesCapabilityAPIKey OpenAIImagesCapability = "images-apikey"
 )
 
 type OpenAIImagesUpload struct {
@@ -232,9 +234,17 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 	}
 
 	applyOpenAIImagesDefaults(req)
+	// Composite middleware preserves multipart bodies, including their public
+	// alias. Forward the resolved model without altering uploads.
+	if platform, _ := ResolvedTargetPlatformFromContext(c.Request.Context()); platform == PlatformOpenAI {
+		if model, ok := ResolvedUpstreamModelFromContext(c.Request.Context()); ok {
+			req.Model = model
+		}
+	}
 	// 前缀门的判定推迟到选中账号之后，见 modelValidationErr 与
-	// ValidateOpenAIImagesAccountModel。
-	req.modelValidationErr = validateOpenAIImagesModel(req.Model)
+	// ValidateOpenAIImagesAccountModel：账号 model_mapping 显式声明的第三方图像
+	// 模型名无法在解析阶段判定，此处只记录错误，不直接拒绝。
+	req.modelValidationErr = validateCompatibleImagesModel(req.Model)
 	req.SizeTier = normalizeOpenAIImageSizeTier(req.Size)
 	req.RequiredCapability = classifyOpenAIImagesCapability(req)
 	return req, nil
@@ -499,6 +509,30 @@ func validateOpenAIImagesModel(model string) error {
 	return fmt.Errorf("images endpoint requires an image model, got %q", model)
 }
 
+// Keep this separate from isOpenAIImageGenerationModel: that predicate also
+// drives native Responses tool conversion, pricing and rate-limit policy.
+func isGeminiCompatibleImageModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return strings.HasPrefix(model, "gemini-") &&
+		(strings.HasSuffix(model, "-image") || strings.Contains(model, "-image-"))
+}
+
+func validateCompatibleImagesModel(model string) error {
+	if isGeminiCompatibleImageModel(model) {
+		return nil
+	}
+	return validateOpenAIImagesModel(model)
+}
+
+// RequiredCapabilityForModel also applies the API-key-only fence when channel
+// mapping introduces a compatible provider model after request parsing.
+func (req *OpenAIImagesRequest) RequiredCapabilityForModel(model string) OpenAIImagesCapability {
+	if isGeminiCompatibleImageModel(model) {
+		return OpenAIImagesCapabilityAPIKey
+	}
+	return req.RequiredCapability
+}
+
 // ValidateOpenAIImagesAccountModel 在账号选定之后判定图像模型名是否可用。
 //
 // 默认仍按 gpt-image-* / grok-imagine* 前缀门放行——那是把文本模型误打到
@@ -525,6 +559,16 @@ func ValidateOpenAIImagesAccountModel(account *Account, parsed *OpenAIImagesRequ
 	if requestModel == "" {
 		requestModel = "gpt-image-2"
 	}
+	// 兼容供应商（gemini-*-image*）只有 API Key 账号能转发：OAuth / setup-token 走的是
+	// 原生 ChatGPT 端点，拿到这类模型名只会在上游失败。该围栏优先于下面的 model_mapping
+	// 放行——运维能声明「这是个图像模型」，但声明不了「原生端点能服务它」。
+	if account != nil && !account.SupportsOpenAIImageCapability(OpenAIImagesCapabilityAPIKey) {
+		for _, candidate := range []string{inboundModel, requestModel, account.GetMappedModel(requestModel)} {
+			if isGeminiCompatibleImageModel(candidate) {
+				return validateOpenAIImagesModel(candidate)
+			}
+		}
+	}
 	if accountDeclaresImagesModel(account, inboundModel) || accountDeclaresImagesModel(account, requestModel) {
 		return nil
 	}
@@ -532,13 +576,13 @@ func ValidateOpenAIImagesAccountModel(account *Account, parsed *OpenAIImagesRequ
 	if parsed.modelValidationErr != nil {
 		return parsed.modelValidationErr
 	}
-	if err := validateOpenAIImagesModel(requestModel); err != nil {
+	if err := validateCompatibleImagesModel(requestModel); err != nil {
 		return err
 	}
 	if account == nil {
 		return nil
 	}
-	return validateOpenAIImagesModel(account.GetMappedModel(requestModel))
+	return validateCompatibleImagesModel(account.GetMappedModel(requestModel))
 }
 
 // accountDeclaresImagesModel 报告账号的 model_mapping 是否精确声明了该模型名。
@@ -570,6 +614,9 @@ func normalizeOpenAIImagesEndpointPath(path string) string {
 func classifyOpenAIImagesCapability(req *OpenAIImagesRequest) OpenAIImagesCapability {
 	if req == nil {
 		return OpenAIImagesCapabilityNative
+	}
+	if isGeminiCompatibleImageModel(req.Model) {
+		return OpenAIImagesCapabilityAPIKey
 	}
 	if req.ExplicitModel || req.ExplicitSize {
 		return OpenAIImagesCapabilityNative
@@ -655,6 +702,8 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
 		requestModel = mapped
 	}
+	// 账号级判定同时覆盖 requestModel 与 account.GetMappedModel(requestModel)，
+	// 故此处不再单独校验 upstreamModel。
 	if err := ValidateOpenAIImagesAccountModel(account, parsed, channelMappedModel); err != nil {
 		return nil, err
 	}
@@ -719,6 +768,22 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+		if isOpenAIImagesInsufficientBalance(respBody) {
+			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+				ProxyID:            opsUpstreamProxyID(account),
+				ProxyName:          opsUpstreamProxyName(account),
+				Platform:           account.Platform,
+				AccountID:          account.ID,
+				AccountName:        account.Name,
+				UpstreamStatusCode: resp.StatusCode,
+				UpstreamRequestID:  resp.Header.Get("x-request-id"),
+				UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
+				Kind:               "failover",
+				Message:            OpenAIImagesInsufficientBalanceMessage,
+			})
+			s.coolOpenAIImagesInsufficientBalance(upstreamCtx, account)
+			return nil, newOpenAIImagesInsufficientBalanceFailoverError(resp.StatusCode, resp.Header, respBody)
+		}
 		if s.shouldFailoverOpenAIUpstreamResponse(account, resp.StatusCode, upstreamMsg, respBody) {
 			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 				ProxyID:            opsUpstreamProxyID(account),
