@@ -251,6 +251,11 @@ func (s *PaymentService) executeFulfillment(ctx context.Context, oid int64) erro
 		return s.ExecuteSubscriptionFulfillment(ctx, oid)
 	case payment.OrderTypeBalance:
 		return s.ExecuteBalanceFulfillment(ctx, oid)
+	case BundleSubscriptionType:
+		if s.bundleSubscriptionSvc == nil {
+			return ErrBundleSubscriptionsDisabled
+		}
+		return s.ExecuteBundleFulfillment(ctx, oid)
 	default:
 		// 不支持的订单类型不履约：标记 FAILED 后正常返回，避免支付回调持续 500 重试。
 		s.rejectUnsupportedOrderType(ctx, o)
@@ -278,13 +283,6 @@ func (s *PaymentService) rejectUnsupportedOrderType(ctx context.Context, o *dben
 		slog.Warn("payment order with unsupported order type not fulfilled", "orderID", o.ID, "orderType", o.OrderType)
 		s.writeAuditLog(ctx, o.ID, "FULFILLMENT_FAILED", "system", map[string]any{"reason": reason})
 	}
-	if o.OrderType == BundleSubscriptionType {
-		if s.bundleSubscriptionSvc == nil {
-			return ErrBundleSubscriptionsDisabled
-		}
-		return s.ExecuteBundleFulfillment(ctx, oid)
-	}
-	return s.ExecuteBalanceFulfillment(ctx, oid)
 }
 
 // ExecuteBundleFulfillment uses the same short-lived order lease as legacy
