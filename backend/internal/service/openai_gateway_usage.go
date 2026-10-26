@@ -638,8 +638,9 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	}
 
 	if result != nil && result.ImageCount > 0 {
-		// 为该模型精确配置、且配了图片输出价的 token 价卡才走 token 路径，否则按次计费
-		if !imageTokenBillingExplicit(s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey)) {
+		// 专用图片端点可由分组强制按张计费；其他请求只有显式配置图片输出价的 token 价卡才走 token 路径。
+		if imageCountBillingApplies(apiKey, result.ImageEndpoint) ||
+			!imageTokenBillingExplicit(s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey)) {
 			return s.calculateOpenAIImageCost(ctx, billingModel, apiKey, result, imageMultiplier), nil
 		}
 	}
