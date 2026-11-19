@@ -272,5 +272,5 @@ func TestFetchUpstreamSupportedModelsVertexFirstPage404KeepsStatus(t *testing.T)
 	svc := vertexModelSyncTestService(upstream)
 
 	_, err := svc.FetchUpstreamSupportedModels(context.Background(), vertexModelSyncTestAccount(nil))
-	require.True(t, upstreamModelListEndpointUnsupported(err))
+	require.True(t, upstreamModelListEndpointUnsupported(err, vertexModelSyncTestAccount(nil)))
 }

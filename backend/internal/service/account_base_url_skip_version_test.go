@@ -70,15 +70,15 @@ func TestBuildOpenAIImagesURLWithSkipVersionAccount(t *testing.T) {
 
 func TestUpstreamModelListEndpointUnsupported(t *testing.T) {
 	tests := []struct {
-		name       string
-		statusCode int
-		want       bool
+		name        string
+		statusCode  int
+		skipVersion bool
+		want        bool
 	}{
 		{name: "not found", statusCode: http.StatusNotFound, want: true},
 		{name: "method not allowed", statusCode: http.StatusMethodNotAllowed, want: true},
-		// 只开放特定路径的上游（如只挂 /api-proxy/images/*）在网关层直接拒绝其余
-		// 路径，同样等价于"没有模型列表端点"，管理后台同步应回退而非硬报错。
-		{name: "forbidden", statusCode: http.StatusForbidden, want: true},
+		{name: "forbidden on unversioned OpenAI endpoint", statusCode: http.StatusForbidden, skipVersion: true, want: true},
+		{name: "forbidden on normal endpoint", statusCode: http.StatusForbidden, want: false},
 		// 401 是凭据失效的主信号，必须保持硬失败，否则坏 key 会被伪装成同步成功。
 		{name: "unauthorized stays a real failure", statusCode: http.StatusUnauthorized, want: false},
 		{name: "bad gateway is a real failure", statusCode: http.StatusBadGateway, want: false},
@@ -93,7 +93,8 @@ func TestUpstreamModelListEndpointUnsupported(t *testing.T) {
 				Message:    "upstream model list failed",
 				StatusCode: tt.statusCode,
 			}
-			require.Equal(t, tt.want, upstreamModelListEndpointUnsupported(err))
+			account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"base_url_skip_version": tt.skipVersion}}
+			require.Equal(t, tt.want, upstreamModelListEndpointUnsupported(err, account))
 		})
 	}
 }
